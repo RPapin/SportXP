@@ -1,106 +1,438 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
+import { CommonModule, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from '../../core/services/auth.service';
-import { LevelBarComponent } from '../../shared/components/level-bar/level-bar.component';
+import { getLevelFromXP, getProgressPercent, getXPForLevel } from '../../shared/pipes/xp-level.pipe';
 import { environment } from '../../../environments/environment';
+
+const ACHIEVEMENT_ICONS: Record<string, string> = {
+  first_activity:   '🏁',
+  distance_100:     '🏆',
+  distance_500:     '🌟',
+  streak_7:         '🔥',
+  streak_30:        '💪',
+  explorer:         '🗺️',
+  speed_demon:      '⚡',
+  mountain_goat:    '⛰️',
+};
+
+const SPORT_ICONS: Record<string, string> = {
+  Run: '🏃', TrailRun: '🏔️', Ride: '🚴',
+  MountainBikeRide: '🚵', GravelRide: '🚴',
+};
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule, DatePipe, DecimalPipe, MatCardModule, MatButtonModule, MatIconModule, MatDividerModule, MatSnackBarModule, MatTooltipModule, LevelBarComponent],
+  imports: [CommonModule, DecimalPipe, MatSnackBarModule],
   template: `
-    <div class="profile-container">
-      @if (auth.currentUser(); as user) {
-        <mat-card class="profile-header-card">
-          <mat-card-content>
-            <div class="profile-header">
-              <img class="avatar" [src]="user.avatarUrl" [alt]="user.firstName">
-              <div class="profile-info">
-                <h2>{{ user.firstName }} {{ user.lastName }}</h2>
-                <p class="location">{{ user.city }}{{ user.region ? ', ' + user.region : '' }}{{ user.country ? ', ' + user.country : '' }}</p>
-                <app-level-bar [xp]="user.xpTotal"></app-level-bar>
-              </div>
-            </div>
-            <div class="stats-grid">
-              <div class="stat">
-                <span class="stat-value">{{ user.xpTotal | number }}</span>
-                <span class="stat-label">XP Total</span>
-              </div>
-              <div class="stat">
-                <span class="stat-value">{{ activities().length }}</span>
-                <span class="stat-label">Activités</span>
-              </div>
-              <div class="stat">
-                <span class="stat-value">{{ totalDistanceKm() | number:'1.0-0' }}</span>
-                <span class="stat-label">km parcourus</span>
-              </div>
-            </div>
-            <button mat-raised-button color="accent" (click)="syncActivities()" [disabled]="syncing()">
-              <mat-icon>sync</mat-icon>
-              {{ syncing() ? 'Synchronisation...' : 'Synchroniser mes activités' }}
-            </button>
-          </mat-card-content>
-        </mat-card>
+    @if (auth.currentUser(); as user) {
+      <div class="profile-page">
 
-        <mat-card class="achievements-card">
-          <mat-card-header><mat-card-title>Achievements</mat-card-title></mat-card-header>
-          <mat-card-content>
+        <!-- Gradient Header -->
+        <div class="profile-header">
+          <img
+            class="profile-avatar"
+            [src]="user.avatarUrl || 'assets/avatar-default.png'"
+            [alt]="user.firstName"
+          />
+          <h2 class="profile-name">{{ user.firstName }} {{ user.lastName }}</h2>
+          @if (user.city || user.country) {
+            <p class="profile-location">
+              {{ user.city }}{{ user.city && user.country ? ', ' : '' }}{{ user.country }}
+            </p>
+          }
+
+          <!-- XP Bar -->
+          <div class="xp-bar-container">
+            <div class="xp-bar-header">
+              <div class="level-info">
+                <span class="level-text">Niveau {{ level(user.xpTotal) }}</span>
+                <span class="level-badge">Athlète</span>
+              </div>
+              <span class="xp-ratio">{{ user.xpTotal | number }} / {{ nextXP(user.xpTotal) | number }} XP</span>
+            </div>
+            <div class="xp-track">
+              <div class="xp-fill" [style.width.%]="progress(user.xpTotal)"></div>
+            </div>
+            <p class="xp-remaining">{{ (nextXP(user.xpTotal) - user.xpTotal) | number }} XP jusqu'au niveau {{ level(user.xpTotal) + 1 }}</p>
+          </div>
+        </div>
+
+        <!-- Stats Cards (overlap header) -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-value">{{ user.xpTotal | number }}</div>
+            <div class="stat-label">XP Total</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ activities().length }}</div>
+            <div class="stat-label">Activités</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ totalKm() | number:'1.0-0' }}</div>
+            <div class="stat-label">km parcourus</div>
+          </div>
+        </div>
+
+        <!-- Sync Button -->
+        <div class="sync-section">
+          <button class="sync-btn" (click)="syncActivities()" [disabled]="syncing()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M21 2v6h-6"/>
+              <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+              <path d="M3 22v-6h6"/>
+              <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+            </svg>
+            {{ syncing() ? 'Synchronisation…' : 'Synchroniser mes activités Strava' }}
+          </button>
+        </div>
+
+        <!-- Achievements -->
+        @if (userAchievements().length > 0) {
+          <div class="section">
+            <div class="section-header">
+              <h3 class="section-title">
+                <span>🏅</span> Trophées débloqués
+              </h3>
+            </div>
             <div class="achievements-grid">
               @for (ua of userAchievements(); track ua.id) {
-                <div class="achievement-badge" [matTooltip]="ua.description">
-                  <mat-icon color="accent">emoji_events</mat-icon>
-                  <span>{{ ua.name }}</span>
+                <div class="achievement-item" [title]="ua.description">
+                  <div class="achievement-icon">{{ achievementIcon(ua.name) }}</div>
+                  <span class="achievement-name">{{ ua.name }}</span>
                 </div>
               }
             </div>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        }
 
-        <mat-card>
-          <mat-card-header><mat-card-title>Mes dernières activités</mat-card-title></mat-card-header>
-          <mat-card-content>
-            @for (a of activities(); track a.id) {
-              <div class="activity-row">
-                <mat-icon>{{ sportIcon(a.sportType) }}</mat-icon>
-                <div class="activity-details">
-                  <span class="activity-name">{{ a.name }}</span>
-                  <span class="activity-meta">{{ (a.distanceM / 1000) | number:'1.1-1' }} km · {{ a.startDate | date:'dd/MM/yy' }}</span>
+        <!-- Recent Activities -->
+        <div class="section">
+          <div class="section-header">
+            <h3 class="section-title">
+              <span>⚡</span> Activités récentes
+            </h3>
+          </div>
+          @for (a of activities(); track a.id) {
+            <div class="activity-row">
+              <div class="activity-emoji">{{ sportIcon(a.sportType) }}</div>
+              <div class="activity-details">
+                <div class="activity-name">{{ a.name }}</div>
+                <div class="activity-meta">
+                  {{ (a.distanceM / 1000) | number:'1.1-1' }} km
+                  @if (a.startDate) { · {{ a.startDate | date:'dd MMM yy' }} }
                 </div>
-                <span class="activity-xp">+{{ a.xpEarned | number:'1.0-0' }} XP</span>
               </div>
-              <mat-divider></mat-divider>
-            }
-          </mat-card-content>
-        </mat-card>
-      }
-    </div>
+              <div class="activity-xp">+{{ a.xpEarned | number:'1.0-0' }} XP</div>
+            </div>
+          }
+          @if (activities().length === 0) {
+            <p class="no-activities">Aucune activité synchronisée</p>
+          }
+        </div>
+
+        <!-- Settings / Logout -->
+        <div class="section logout-section">
+          <button class="logout-btn" (click)="auth.logout()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" x2="9" y1="12" y2="12"/>
+            </svg>
+            Se déconnecter
+          </button>
+        </div>
+
+        <div class="page-bottom"></div>
+      </div>
+    } @else {
+      <div class="not-logged">
+        <div class="not-logged-icon">👤</div>
+        <p>Connecte-toi avec Strava pour voir ton profil</p>
+      </div>
+    }
   `,
   styles: [`
-    .profile-container { max-width: 900px; margin: 0 auto; padding: 1rem; display: flex; flex-direction: column; gap: 1rem; }
-    .profile-header { display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.5rem; }
-    .avatar { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; }
-    .profile-info { flex: 1; }
-    .profile-info h2 { margin: 0 0 0.25rem; }
-    .location { color: #666; margin: 0 0 1rem; font-size: 0.9rem; }
-    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1rem 0; text-align: center; }
-    .stat { display: flex; flex-direction: column; }
-    .stat-value { font-size: 1.8rem; font-weight: 700; color: #e67e22; }
-    .stat-label { font-size: 0.8rem; color: #666; }
-    .achievements-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-    .achievement-badge { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0.5rem; border: 1px solid #e67e22; border-radius: 8px; min-width: 80px; text-align: center; cursor: default; }
-    .achievement-badge span { font-size: 0.75rem; }
-    .activity-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; }
-    .activity-details { flex: 1; display: flex; flex-direction: column; }
-    .activity-name { font-weight: 500; }
-    .activity-meta { font-size: 0.8rem; color: #666; }
-    .activity-xp { color: #e67e22; font-weight: 700; }
+    .profile-page {
+      background: #f9fafb;
+      min-height: 100%;
+    }
+
+    /* Gradient Header */
+    .profile-header {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      padding: 2rem 1.5rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .profile-avatar {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 4px solid white;
+      margin-bottom: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.2);
+    }
+
+    .profile-name {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: white;
+      margin: 0 0 4px;
+    }
+
+    .profile-location {
+      color: #bfdbfe;
+      margin: 0 0 16px;
+      font-size: 0.85rem;
+    }
+
+    /* XP Bar */
+    .xp-bar-container {
+      width: 100%;
+      max-width: 320px;
+    }
+
+    .xp-bar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .level-info {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .level-text {
+      font-weight: 700;
+      font-size: 1rem;
+      color: white;
+    }
+
+    .level-badge {
+      font-size: 0.7rem;
+      background: rgba(255,255,255,.2);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 500;
+    }
+
+    .xp-ratio {
+      font-size: 0.78rem;
+      color: #bfdbfe;
+    }
+
+    .xp-track {
+      height: 10px;
+      background: rgba(255,255,255,.25);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .xp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #fcd34d, #fbbf24);
+      border-radius: 999px;
+      transition: width 0.6s ease;
+    }
+
+    .xp-remaining {
+      font-size: 0.72rem;
+      color: #bfdbfe;
+      margin: 4px 0 0;
+      text-align: center;
+    }
+
+    /* Stats Row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      padding: 0 12px;
+      margin-top: -20px;
+      margin-bottom: 12px;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 10px;
+      padding: 12px 8px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+
+    .stat-value {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 2px;
+    }
+
+    .stat-label {
+      font-size: 0.7rem;
+      color: #6b7280;
+    }
+
+    /* Sync */
+    .sync-section {
+      padding: 0 12px 12px;
+    }
+
+    .sync-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity 0.15s;
+    }
+
+    .sync-btn:hover:not(:disabled) { opacity: 0.9; }
+    .sync-btn:disabled { opacity: 0.6; cursor: default; }
+
+    /* Section */
+    .section {
+      background: white;
+      border-top: 1px solid rgba(0,0,0,.06);
+      border-bottom: 1px solid rgba(0,0,0,.06);
+      margin-bottom: 8px;
+    }
+
+    .section-header {
+      padding: 12px 16px 8px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .section-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #111827;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Achievements */
+    .achievements-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 12px 16px;
+    }
+
+    .achievement-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: default;
+    }
+
+    .achievement-icon {
+      width: 44px;
+      height: 44px;
+      background: #fef9c3;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      margin-bottom: 4px;
+    }
+
+    .achievement-name {
+      font-size: 0.65rem;
+      color: #374151;
+      text-align: center;
+      font-weight: 500;
+    }
+
+    /* Activities */
+    .activity-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid #f9fafb;
+    }
+
+    .activity-emoji { font-size: 1.2rem; width: 28px; text-align: center; flex-shrink: 0; }
+
+    .activity-details { flex: 1; min-width: 0; }
+
+    .activity-name {
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: #111827;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .activity-meta { font-size: 0.75rem; color: #6b7280; margin-top: 1px; }
+
+    .activity-xp {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #2563eb;
+      flex-shrink: 0;
+    }
+
+    .no-activities { padding: 1rem 1rem; color: #6b7280; font-size: 0.85rem; margin: 0; }
+
+    /* Logout */
+    .logout-section { padding: 0; }
+
+    .logout-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 16px;
+      background: none;
+      border: none;
+      color: #dc2626;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.1s;
+    }
+
+    .logout-btn:hover { background: #fef2f2; }
+
+    .page-bottom { height: 1rem; }
+
+    /* Not logged in */
+    .not-logged {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 4rem 2rem;
+      text-align: center;
+    }
+    .not-logged-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .not-logged p { color: #6b7280; }
   `],
 })
 export class ProfileComponent implements OnInit {
@@ -119,31 +451,40 @@ export class ProfileComponent implements OnInit {
     this.loadAchievements();
   }
 
-  totalDistanceKm(): number {
-    return this.activities().reduce((sum, a) => sum + a.distanceM, 0) / 1000;
+  level(xp: number): number   { return getLevelFromXP(xp ?? 0); }
+  progress(xp: number): number { return getProgressPercent(xp ?? 0); }
+  nextXP(xp: number): number  { return getXPForLevel(getLevelFromXP(xp ?? 0) + 1); }
+
+  totalKm(): number {
+    return this.activities().reduce((s, a) => s + (a.distanceM ?? 0), 0) / 1000;
+  }
+
+  achievementIcon(name: string): string {
+    const key = name?.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    return ACHIEVEMENT_ICONS[key] ?? '🏅';
+  }
+
+  sportIcon(type: string): string {
+    return SPORT_ICONS[type] ?? '⚡';
   }
 
   syncActivities() {
     this.syncing.set(true);
     this.http.post<{ imported: number; skipped: number }>(`${environment.apiUrl}/api/activities/sync-all`, {}).subscribe({
       next: (result) => {
-        this.snackBar.open(`${result.imported} activités importées, ${result.skipped} ignorées`, 'OK', { duration: 4000 });
+        this.snackBar.open(
+          `${result.imported} activité(s) importée(s)`,
+          '✕',
+          { duration: 4000 },
+        );
         this.loadActivities();
         this.syncing.set(false);
       },
       error: () => {
-        this.snackBar.open('Erreur lors de la synchronisation', 'OK', { duration: 3000 });
+        this.snackBar.open('Erreur lors de la synchronisation', '✕', { duration: 3000 });
         this.syncing.set(false);
       },
     });
-  }
-
-  sportIcon(type: string): string {
-    const icons: Record<string, string> = {
-      Run: 'directions_run', Ride: 'directions_bike', Hike: 'hiking',
-      Walk: 'directions_walk', Swim: 'pool', Ski: 'downhill_skiing',
-    };
-    return icons[type] ?? 'fitness_center';
   }
 
   private loadActivities() {

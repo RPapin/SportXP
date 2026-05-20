@@ -3,7 +3,16 @@
     "allow": [
       "PowerShell(npm install *)",
       "PowerShell(nest new *)",
-      "PowerShell(Get-Process *)"
+      "PowerShell(Get-Process *)",
+      "mcp__plugin_figma_figma__whoami",
+      "mcp__plugin_figma_figma__use_figma",
+      "mcp__plugin_figma_figma__get_design_context",
+      "Bash(Get-ChildItem -Path \"D:\\\\IdeaProjects\\\\ObjectifMilliard\\\\frontend\\\\src\" -Recurse -File)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)",
+      "Bash(New-Item -ItemType Directory -Force \"D:\\\\IdeaProjects\\\\ObjectifMilliard\\\\frontend\\\\src\\\\app\\\\features\\\\club\")",
+      "Bash(Out-Null)",
+      "PowerShell(New-Item *)"
     ]
   }
 }

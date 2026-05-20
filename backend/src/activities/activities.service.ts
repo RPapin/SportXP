@@ -77,8 +77,7 @@ export class ActivitiesService {
       .select('a.stravaActivityId')
       .where('a.stravaActivityId IN (:...ids)', { ids: eligibleIds })
       .getMany();
-    const existingIds = new Set(existing.map(a => a.stravaActivityId));
-
+    const existingIds = new Set(existing.map(a => Number(a.stravaActivityId)));
     const toImport = eligible.filter(a => !existingIds.has(a.id));
     const skipped = allActivities.length - toImport.length;
 
@@ -100,11 +99,17 @@ export class ActivitiesService {
     const distanceM: number = stravaData.distance ?? 0;
     if (distanceM === 0) return null;
     const gradePercent: number | null = stravaData.average_grade_percent ?? null;
-    const xpEarned = Math.round(calculateXP(distanceM, gradePercent));
 
-    const polyline = stravaData.map?.polyline
-      ? await this.decodePolylineToGeoJSON(stravaData.map.polyline)
+    const polylineData = stravaData.map?.polyline
+      ? this.buildPolylineData(stravaData.map.polyline)
       : null;
+
+    const newDistanceM = polylineData
+      ? await this.computeNewDistance(user.id, polylineData.geoJSON)
+      : 0;
+
+    const xpEarned = Math.round(calculateXP(newDistanceM, gradePercent));
+    const polyline = polylineData?.postgisFunc ?? null;
 
     const activity = new Activity();
     activity.stravaActivityId = stravaData.id;
@@ -150,18 +155,47 @@ export class ActivitiesService {
     for (const achievement of newAchievements) {
       this.eventsGateway.emitAchievementUnlocked(user.id, achievement);
     }
-
+    console.log('Nouvelle activité sauvegardé :', activity.name)
     return activity;
   }
 
-  private async decodePolylineToGeoJSON(encoded: string): Promise<any> {
+  private buildPolylineData(encoded: string): { geoJSON: object; postgisFunc: () => string } | null {
     const coords = this.decodePolyline(encoded);
     if (coords.length < 2) return null;
-    return () =>
-      `ST_GeomFromGeoJSON('${JSON.stringify({
-        type: 'LineString',
-        coordinates: coords.map(([lat, lng]) => [lng, lat]),
-      })}')`;
+    const geoJSON = {
+      type: 'LineString',
+      coordinates: coords.map(([lat, lng]) => [lng, lat]),
+    };
+    return {
+      geoJSON,
+      postgisFunc: () => `ST_GeomFromGeoJSON('${JSON.stringify(geoJSON)}')`,
+    };
+  }
+
+  private async computeNewDistance(userId: string, geoJSON: object): Promise<number> {
+    const rows = await this.dataSource.query(
+      `WITH new_route AS (
+         SELECT ST_SetSRID(ST_GeomFromGeoJSON($1), 4326) AS geom
+       ),
+       explored_union AS (
+         SELECT ST_Union(ST_Buffer(polyline::geography, 15)::geometry) AS zone
+         FROM activities
+         WHERE user_id = $2 AND polyline IS NOT NULL
+       ),
+       new_portion AS (
+         SELECT CASE
+           WHEN (SELECT zone FROM explored_union) IS NULL
+             THEN (SELECT geom FROM new_route)
+           ELSE ST_Difference(
+             (SELECT geom FROM new_route),
+             (SELECT zone FROM explored_union)
+           )
+         END AS geom
+       )
+       SELECT COALESCE(ST_Length((SELECT geom FROM new_portion)::geography), 0) AS new_distance_m`,
+      [JSON.stringify(geoJSON), userId],
+    );
+    return parseFloat(rows[0]?.new_distance_m ?? '0');
   }
 
   private decodePolyline(encoded: string): [number, number][] {
@@ -191,13 +225,33 @@ export class ActivitiesService {
   }
 
   async getFeed(limit = 20, offset = 0) {
-    return this.activityRepo.find({
-      where: { isCounted: true },
-      relations: { user: true },
-      order: { startDate: 'DESC' },
-      take: limit,
-      skip: offset,
-    });
+    const rows = await this.activityRepo
+      .createQueryBuilder('a')
+      .select(['a.id', 'a.name', 'a.sportType', 'a.distanceM', 'a.xpEarned', 'a.startDate', 'a.isCounted'])
+      .addSelect('ST_AsGeoJSON(a.polyline)::json', 'geojson')
+      .leftJoin('a.user', 'u')
+      .addSelect(['u.id', 'u.firstName', 'u.lastName', 'u.avatarUrl'])
+      .where('a.isCounted = true')
+      .orderBy('a.startDate', 'DESC')
+      .limit(limit)
+      .offset(offset)
+      .getRawMany();
+
+    return rows.map(r => ({
+      id: r.a_id,
+      name: r.a_name,
+      sportType: r.a_sport_type,
+      distanceM: r.a_distance_m,
+      xpEarned: r.a_xp_earned,
+      startDate: r.a_start_date,
+      geojson: r.geojson,
+      user: {
+        id: r.u_id,
+        firstName: r.u_first_name,
+        lastName: r.u_last_name,
+        avatarUrl: r.u_avatar_url,
+      },
+    }));
   }
 
   async getMapGeoJSON(userId?: string, sportType?: string, from?: Date, to?: Date) {
