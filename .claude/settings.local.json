@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npm install *)",
+      "PowerShell(nest new *)",
+      "PowerShell(Get-Process *)"
+    ]
+  }
+}

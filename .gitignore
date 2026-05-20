@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.angular/
+
+# Environment files — ne jamais committer les secrets
+backend/.env
+frontend/src/environments/environment.prod.ts
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Docker volumes
+pgdata/
+
+# TypeORM migrations auto-générées (optionnel — commenter si tu veux les versionner)
+# backend/src/database/migrations/
+
+# Coverage
+coverage/
