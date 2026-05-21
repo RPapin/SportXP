@@ -22,6 +22,23 @@ interface AdminUser {
   createdAt: string;
 }
 
+interface AchievementForm {
+  code: string;
+  name: string;
+  description: string;
+  conditionType: string;
+  conditionValue: number | null;
+  xpThreshold: number | null;
+}
+
+const CONDITION_LABELS: Record<string, string> = {
+  level: 'Niveau',
+  total_xp: 'XP total',
+  activity_count: 'Nb activités',
+  distance_total: 'Distance (m)',
+  streak_days: 'Streak (jours)',
+};
+
 @Component({
   selector: 'app-admin',
   standalone: true,
@@ -117,19 +134,79 @@ interface AdminUser {
       <!-- Achievements tab -->
       @if (activeTab() === 'achievements') {
         <div class="section">
+          <div class="section-header">
+            <span class="section-title">{{ achievements().length }} achievement{{ achievements().length !== 1 ? 's' : '' }}</span>
+            <button class="btn-sm btn-add" (click)="toggleCreateForm()">
+              {{ showCreateForm() ? '✕ Annuler' : '➕ Ajouter' }}
+            </button>
+          </div>
+
+          @if (showCreateForm()) {
+            <form class="achievement-form" #createFormRef="ngForm" (ngSubmit)="submitCreate()">
+              <div class="form-row">
+                <input type="text" placeholder="Code (ex: first_run)" [(ngModel)]="createForm.code" name="c_code" required class="form-input" />
+                <input type="text" placeholder="Nom" [(ngModel)]="createForm.name" name="c_name" required class="form-input" />
+              </div>
+              <textarea placeholder="Description (optionnel)" [(ngModel)]="createForm.description" name="c_desc" rows="2" class="form-input"></textarea>
+              <div class="form-row">
+                <select [(ngModel)]="createForm.conditionType" name="c_type" required class="form-input form-select">
+                  <option value="level">Niveau</option>
+                  <option value="total_xp">XP total</option>
+                  <option value="activity_count">Nb activités</option>
+                  <option value="distance_total">Distance (m)</option>
+                  <option value="streak_days">Streak (jours)</option>
+                </select>
+                <input type="number" placeholder="Valeur condition" [(ngModel)]="createForm.conditionValue" name="c_value" required class="form-input" />
+                <input type="number" placeholder="Seuil XP (opt.)" [(ngModel)]="createForm.xpThreshold" name="c_threshold" class="form-input" />
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary" [disabled]="!createFormRef.valid">Créer l'achievement</button>
+              </div>
+            </form>
+          }
+
           <div class="achievement-list">
             @for (a of achievements(); track a.id) {
-              <div class="achievement-card">
-                <div class="achievement-info">
-                  <div class="achievement-name">{{ a.name }}</div>
-                  <div class="achievement-code">{{ a.code }}</div>
-                  <div class="achievement-cond">{{ a.conditionType }} ≥ {{ a.conditionValue }}</div>
+              @if (editingId() === a.id) {
+                <form class="achievement-form achievement-form--edit" #editFormRef="ngForm" (ngSubmit)="submitEdit(a.id)">
+                  <div class="form-row">
+                    <input type="text" placeholder="Code" [(ngModel)]="editForm.code" name="e_code" required class="form-input" />
+                    <input type="text" placeholder="Nom" [(ngModel)]="editForm.name" name="e_name" required class="form-input" />
+                  </div>
+                  <textarea placeholder="Description" [(ngModel)]="editForm.description" name="e_desc" rows="2" class="form-input"></textarea>
+                  <div class="form-row">
+                    <select [(ngModel)]="editForm.conditionType" name="e_type" required class="form-input form-select">
+                      <option value="level">Niveau</option>
+                      <option value="total_xp">XP total</option>
+                      <option value="activity_count">Nb activités</option>
+                      <option value="distance_total">Distance (m)</option>
+                      <option value="streak_days">Streak (jours)</option>
+                    </select>
+                    <input type="number" placeholder="Valeur" [(ngModel)]="editForm.conditionValue" name="e_value" required class="form-input" />
+                    <input type="number" placeholder="Seuil XP" [(ngModel)]="editForm.xpThreshold" name="e_threshold" class="form-input" />
+                  </div>
+                  <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" [disabled]="!editFormRef.valid">Enregistrer</button>
+                    <button type="button" class="btn-sm btn-active" (click)="editingId.set('')">Annuler</button>
+                  </div>
+                </form>
+              } @else {
+                <div class="achievement-card">
+                  <div class="achievement-info">
+                    <div class="achievement-name">{{ a.name }}</div>
+                    <div class="achievement-code">{{ a.code }}</div>
+                    <div class="achievement-cond">{{ conditionLabel(a.conditionType) }} ≥ {{ a.conditionValue }}{{ a.xpThreshold != null ? ' · ' + a.xpThreshold + ' XP' : '' }}</div>
+                    @if (a.description) { <div class="achievement-desc">{{ a.description }}</div> }
+                  </div>
+                  <div class="achievement-actions">
+                    <button class="btn-sm btn-edit" (click)="startEdit(a)" title="Modifier">✏️</button>
+                    <button class="btn-sm btn-delete" (click)="deleteAchievement(a)" title="Supprimer">🗑️</button>
+                  </div>
                 </div>
-                <button class="btn-sm btn-delete" (click)="deleteAchievement(a)" title="Supprimer">🗑️</button>
-              </div>
+              }
             }
-            @if (achievements().length === 0) {
-              <div class="empty">Aucun achievement</div>
+            @if (achievements().length === 0 && !showCreateForm()) {
+              <div class="empty">Aucun achievement — cliquez sur ➕ pour en créer un</div>
             }
           </div>
         </div>
@@ -310,12 +387,79 @@ interface AdminUser {
       flex-shrink: 0;
     }
 
+    /* Section header */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .section-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Achievement form */
+    .achievement-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 14px 16px;
+      background: #fafafa;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .achievement-form--edit {
+      background: #fffbf5;
+      border-left: 3px solid #e67e22;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .form-row .form-input { flex: 1; min-width: 100px; }
+
+    .form-input {
+      padding: 8px 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-family: inherit;
+      color: #111827;
+      background: white;
+      outline: none;
+      width: 100%;
+      box-sizing: border-box;
+      transition: border-color 0.15s;
+    }
+
+    .form-input:focus { border-color: #e67e22; }
+
+    textarea.form-input { resize: vertical; }
+
+    .form-select { cursor: pointer; }
+
+    .form-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 2px;
+    }
+
     /* Achievement cards */
     .achievement-list { display: flex; flex-direction: column; }
 
     .achievement-card {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 12px;
       padding: 12px 16px;
       border-bottom: 1px solid #f3f4f6;
@@ -328,6 +472,14 @@ interface AdminUser {
     .achievement-name { font-size: 0.88rem; font-weight: 600; color: #111827; }
     .achievement-code { font-size: 0.72rem; color: #6b7280; font-family: monospace; }
     .achievement-cond { font-size: 0.75rem; color: #4b5563; margin-top: 2px; }
+    .achievement-desc { font-size: 0.75rem; color: #6b7280; margin-top: 3px; font-style: italic; }
+
+    .achievement-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+    }
 
     /* Buttons */
     .btn {
@@ -359,6 +511,8 @@ interface AdminUser {
     .btn-role   { background: #ede9fe; color: #5b21b6; }
     .btn-active { background: #f3f4f6; color: #374151; }
     .btn-delete { background: #fee2e2; color: #991b1b; }
+    .btn-add    { background: #dcfce7; color: #15803d; }
+    .btn-edit   { background: #dbeafe; color: #1d4ed8; }
 
     .empty {
       padding: 2.5rem;
@@ -393,6 +547,11 @@ export class AdminComponent implements OnInit {
   recalcLoading = signal(false);
   recalcMsg = signal('');
   toast = signal('');
+  showCreateForm = signal(false);
+  editingId = signal('');
+
+  createForm: AchievementForm = this.emptyForm();
+  editForm: AchievementForm = this.emptyForm();
 
   private readonly api = environment.apiUrl;
 
@@ -400,6 +559,62 @@ export class AdminComponent implements OnInit {
 
   ngOnInit() {
     this.loadAll();
+  }
+
+  conditionLabel(type: string): string {
+    return CONDITION_LABELS[type] ?? type;
+  }
+
+  toggleCreateForm() {
+    this.showCreateForm.update(v => !v);
+    if (this.showCreateForm()) {
+      this.createForm = this.emptyForm();
+      this.editingId.set('');
+    }
+  }
+
+  startEdit(a: any) {
+    this.editingId.set(a.id);
+    this.showCreateForm.set(false);
+    this.editForm = {
+      code: a.code,
+      name: a.name,
+      description: a.description ?? '',
+      conditionType: a.conditionType,
+      conditionValue: a.conditionValue,
+      xpThreshold: a.xpThreshold ?? null,
+    };
+  }
+
+  submitCreate() {
+    const body = {
+      ...this.createForm,
+      conditionValue: Number(this.createForm.conditionValue),
+      xpThreshold: this.createForm.xpThreshold != null ? Number(this.createForm.xpThreshold) : null,
+    };
+    this.http.post<any>(`${this.api}/api/admin/achievements`, body).subscribe({
+      next: (created) => {
+        this.achievements.update(list => [...list, created]);
+        this.showCreateForm.set(false);
+        this.createForm = this.emptyForm();
+        this.showToast('Achievement créé');
+      },
+    });
+  }
+
+  submitEdit(id: string) {
+    const body = {
+      ...this.editForm,
+      conditionValue: Number(this.editForm.conditionValue),
+      xpThreshold: this.editForm.xpThreshold != null ? Number(this.editForm.xpThreshold) : null,
+    };
+    this.http.patch<any>(`${this.api}/api/admin/achievements/${id}`, body).subscribe({
+      next: (updated) => {
+        this.achievements.update(list => list.map(x => x.id === id ? updated : x));
+        this.editingId.set('');
+        this.showToast('Achievement modifié');
+      },
+    });
   }
 
   toggleRole(u: AdminUser) {
@@ -466,5 +681,9 @@ export class AdminComponent implements OnInit {
   private showToast(msg: string) {
     this.toast.set(msg);
     setTimeout(() => this.toast.set(''), 2500);
+  }
+
+  private emptyForm(): AchievementForm {
+    return { code: '', name: '', description: '', conditionType: 'total_xp', conditionValue: null, xpThreshold: null };
   }
 }

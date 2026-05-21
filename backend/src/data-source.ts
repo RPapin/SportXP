@@ -10,12 +10,14 @@ import { ActivityComment } from './database/entities/activity-comment.entity';
 
 dotenv.config();
 
+
+const dbUrl = process.env.DATABASE_URL ?? '';
 export const AppDataSource = new DataSource({
   type: 'postgres',
-  url: process.env.DATABASE_URL,
+  url: dbUrl,
   entities: [User, Activity, XpLog, Achievement, UserAchievement, ActivityLike, ActivityComment],
   migrations: ['src/database/migrations/*.ts'],
-  ssl: process.env.DATABASE_URL?.includes('supabase.co')
-    ? { rejectUnauthorized: false }
-    : false,
+  ssl:  dbUrl.includes('localhost') || dbUrl.includes('@db:')
+      ? false
+      : { rejectUnauthorized: false },
 });

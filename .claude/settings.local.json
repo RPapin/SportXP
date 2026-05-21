@@ -16,7 +16,11 @@
       "Bash(Get-ChildItem -Path \"D:\\\\IdeaProjects\\\\SportXP\" -Force)",
       "Bash(Select-Object Name, PSIsContainer)",
       "Bash(Get-ChildItem -Path \"D:\\\\IdeaProjects\\\\SportXP\" -Directory)",
-      "Bash(Select-Object Name)"
+      "Bash(Select-Object Name)",
+      "Bash(Test-Path D:\\\\IdeaProjects\\\\SportXP\\\\backend\\\\Dockerfile *)",
+      "Bash(vercel *)",
+      "Bash(npm i *)",
+      "Bash(npm run *)"
     ]
   }
 }

@@ -15,11 +15,12 @@ import { ActivityComment } from './entities/activity-comment.entity';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const dbUrl = config.get<string>('DATABASE_URL') ?? '';
+
         return {
           type: 'postgres',
           url: dbUrl,
           entities: [User, Activity, XpLog, Achievement, UserAchievement, ActivityLike, ActivityComment],
-          synchronize: process.env.DB_SYNC === 'true',
+          synchronize: config.get<string>('DB_SYNC') === 'true',
           migrations: ['dist/database/migrations/*.js'],
           migrationsRun: true,
           logging: false,
