@@ -43,6 +43,12 @@ export class User {
   @Column({ type: 'int', default: 0, name: 'xp_total' })
   xpTotal: number;
 
+  @Column({ type: 'int', default: 0, name: 'xp_run' })
+  xpRun: number;
+
+  @Column({ type: 'int', default: 0, name: 'xp_bike' })
+  xpBike: number;
+
   @Column({ type: 'text', nullable: true, name: 'strava_access_token' })
   stravaAccessToken: string;
 

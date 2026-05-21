@@ -6,8 +6,8 @@ import * as L from 'leaflet';
   standalone: true,
   template: `<div #mapEl class="map-wrap"></div>`,
   styles: [`
-    :host { display: block; }
-    .map-wrap { width: 100%; height: 160px; background: #e5e7eb; }
+    :host { display: block; height: 220px; }
+    .map-wrap { width: 100%; height: 100%; background: #e5e7eb; }
   `],
 })
 export class ActivityMapPreviewComponent implements AfterViewInit, OnDestroy {

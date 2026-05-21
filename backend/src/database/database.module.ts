@@ -6,21 +6,29 @@ import { Activity } from './entities/activity.entity';
 import { XpLog } from './entities/xp-log.entity';
 import { Achievement } from './entities/achievement.entity';
 import { UserAchievement } from './entities/user-achievement.entity';
+import { ActivityLike } from './entities/activity-like.entity';
+import { ActivityComment } from './entities/activity-comment.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        url: config.get<string>('DATABASE_URL'),
-        entities: [User, Activity, XpLog, Achievement, UserAchievement],
-        synchronize: config.get('NODE_ENV') !== 'production',
-        logging: false,
-        extra: {
-          max: 10,
-        },
-      }),
+      useFactory: (config: ConfigService) => {
+        const dbUrl = config.get<string>('DATABASE_URL') ?? '';
+        return {
+          type: 'postgres',
+          url: dbUrl,
+          entities: [User, Activity, XpLog, Achievement, UserAchievement, ActivityLike, ActivityComment],
+          synchronize: process.env.DB_SYNC === 'true',
+          migrations: ['dist/database/migrations/*.js'],
+          migrationsRun: true,
+          logging: false,
+          ssl: dbUrl.includes('localhost') || dbUrl.includes('@db:')
+            ? false
+            : { rejectUnauthorized: false },
+          extra: { max: 10 },
+        };
+      },
     }),
   ],
 })

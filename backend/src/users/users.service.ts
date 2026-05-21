@@ -7,15 +7,17 @@ import { User, getLevelFromXP } from '../database/entities/user.entity';
 export class UsersService {
   constructor(@InjectRepository(User) private userRepo: Repository<User>) {}
 
-  async getLeaderboard(region?: string, period?: 'month' | 'global') {
+  async getLeaderboard(region?: string, period?: 'month' | 'global', category: 'global' | 'run' | 'bike' = 'global') {
+    const sortColumn = category === 'run' ? 'xpRun' : category === 'bike' ? 'xpBike' : 'xpTotal';
+
     const qb = this.userRepo
       .createQueryBuilder('u')
-      .select(['u.id', 'u.firstName', 'u.lastName', 'u.avatarUrl', 'u.username', 'u.region', 'u.country', 'u.xpTotal'])
+      .select(['u.id', 'u.firstName', 'u.lastName', 'u.avatarUrl', 'u.username', 'u.region', 'u.country', 'u.xpTotal', 'u.xpRun', 'u.xpBike'])
       .where('u.isActive = true');
 
     if (region) qb.andWhere('u.region = :region', { region });
 
-    qb.orderBy('u.xpTotal', 'DESC').limit(100);
+    qb.orderBy(`u.${sortColumn}`, 'DESC').limit(100);
 
     const users = await qb.getMany();
     return users.map((u, index) => ({
@@ -28,6 +30,8 @@ export class UsersService {
       region: u.region,
       country: u.country,
       xpTotal: u.xpTotal,
+      xpRun: u.xpRun,
+      xpBike: u.xpBike,
       level: getLevelFromXP(u.xpTotal),
     }));
   }

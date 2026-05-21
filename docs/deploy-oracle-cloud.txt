@@ -1,0 +1,352 @@
+GUIDE DE DÉPLOIEMENT SUR ORACLE CLOUD FREE TIER
+================================================
+
+ARCHITECTURE CIBLE
+------------------
+
+Internet
+    │
+    ▼
+Oracle VM ARM (4 OCPU / 24 GB RAM — gratuit permanent)
+    │
+    ▼
+Nginx :80 / :443
+    ├── /api/       → NestJS :3000
+    ├── /socket.io/ → NestJS :3000 (WebSocket)
+    └── /           → Angular (nginx :80)
+    │
+PostgreSQL :5432 (container interne)
+
+Tout tourne sur une seule VM via docker-compose.
+
+
+ÉTAPE 1 — CRÉER LE COMPTE ORACLE CLOUD
+---------------------------------------
+
+1. Aller sur cloud.oracle.com → "Start for free"
+2. Remplir avec une carte bancaire (aucun débit, vérification uniquement)
+3. Choisir la région : Germany Central (Frankfurt) ou UK South (London)
+4. Attendre l'email de confirmation (~10-15 min)
+
+IMPORTANT : la région est permanente, elle ne peut pas être changée sans recréer un compte.
+
+
+ÉTAPE 2 — CRÉER LA VM ARM (A1.Flex)
+-------------------------------------
+
+Dans la console Oracle Cloud :
+
+1. Menu → Compute → Instances → Create Instance
+2. Nom : sportxp-server
+3. Image : Canonical Ubuntu 22.04 (minimal)
+4. Shape → cliquer "Change shape" :
+   - Cocher Ampere (colonne de gauche)
+   - Shape : VM.Standard.A1.Flex
+   - OCPUs : 4 / RAM : 24 GB  ← maximum gratuit
+5. Networking : laisser par défaut (VCN créé automatiquement)
+6. SSH Keys : uploader ta clé publique .pub ou cliquer "Generate" pour en créer une
+7. Boot volume : 50 GB
+8. Cliquer Create
+
+Attendre ~2 min que l'instance passe en état "Running". Noter l'IP publique.
+
+
+ÉTAPE 3 — OUVRIR LES PORTS
+----------------------------
+
+3a. Security List Oracle (pare-feu cloud)
+Menu → Networking → Virtual Cloud Networks → ton VCN → Security Lists
+→ Default Security List → Add Ingress Rules
+
+Ajouter ces règles :
+  Source CIDR   | Protocol | Port | Description
+  0.0.0.0/0     | TCP      | 22   | SSH
+  0.0.0.0/0     | TCP      | 80   | HTTP
+  0.0.0.0/0     | TCP      | 443  | HTTPS
+
+3b. Pare-feu Ubuntu (à faire après connexion SSH)
+
+  sudo iptables -I INPUT 6 -p tcp --dport 80 -j ACCEPT
+  sudo iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT
+  sudo apt install -y iptables-persistent
+  sudo netfilter-persistent save
+
+
+ÉTAPE 4 — CONNEXION SSH
+------------------------
+
+Linux / Mac :
+  ssh -i ~/.ssh/ta_cle_privee ubuntu@<IP_PUBLIQUE>
+
+Windows PowerShell :
+  ssh -i C:\Users\TonNom\.ssh\ta_cle_privee ubuntu@<IP_PUBLIQUE>
+
+Si tu as généré la clé depuis Oracle, télécharger le fichier .key fourni et l'utiliser directement.
+
+
+ÉTAPE 5 — INSTALLER DOCKER
+----------------------------
+
+  # Mise à jour système
+  sudo apt update && sudo apt upgrade -y
+
+  # Installer Docker (script officiel)
+  curl -fsSL https://get.docker.com | sudo sh
+
+  # Ajouter l'utilisateur ubuntu au groupe docker
+  sudo usermod -aG docker ubuntu
+
+  # Ouvrir les ports dans le pare-feu Ubuntu
+  sudo apt install -y iptables-persistent
+  sudo iptables -I INPUT 6 -p tcp --dport 80 -j ACCEPT
+  sudo iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT
+  sudo netfilter-persistent save
+
+  # Reconnecter pour appliquer le groupe docker
+  exit
+
+Reconnecter en SSH, puis vérifier :
+  docker --version        # Docker 24.x
+  docker compose version  # Docker Compose v2.x
+
+
+ÉTAPE 6 — CLONER LE PROJET
+----------------------------
+
+  sudo apt install -y git
+
+  # Repo public
+  git clone https://github.com/ton-user/sportxp.git
+  cd sportxp
+
+  # Repo privé : utiliser un token GitHub
+  git clone https://TON_TOKEN@github.com/ton-user/sportxp.git
+
+
+ÉTAPE 7 — CONFIGURER LES VARIABLES D'ENVIRONNEMENT
+----------------------------------------------------
+
+  cp backend/.env.example backend/.env
+  nano backend/.env
+
+Remplir le fichier :
+
+  STRAVA_CLIENT_ID=ton_client_id
+  STRAVA_CLIENT_SECRET=ton_client_secret
+  STRAVA_WEBHOOK_VERIFY_TOKEN=un_token_aleatoire_long
+
+  JWT_SECRET=generer_avec_openssl_rand_hex_32
+
+  # URL interne Docker — ne pas changer
+  DATABASE_URL=postgresql://stravaxp_user:stravaxp_pass@db:5432/stravaxp
+
+  # Remplacer par ton domaine ou l'IP Oracle
+  FRONTEND_URL=https://ton-domaine.com
+  API_URL=https://ton-domaine.com
+
+  NODE_ENV=production
+
+  # Activer pour le premier démarrage uniquement
+  DB_SYNC=true
+
+Générer un JWT_SECRET solide :
+  openssl rand -hex 32
+
+NOTE : Si tu n'as pas de domaine, mettre l'IP publique Oracle : http://123.456.789.0
+Le HTTPS ne sera pas disponible mais tout fonctionnera.
+
+
+ÉTAPE 8 — CONFIGURER NGINX POUR LA PRODUCTION
+----------------------------------------------
+
+Le nginx.conf actuel fonctionne en HTTP.
+Sans domaine (HTTP uniquement) : le nginx.conf existant fonctionne tel quel, passer à l'étape 9.
+
+Avec domaine, remplacer le contenu de nginx.conf :
+
+  nano nginx.conf
+
+Contenu :
+
+  upstream api {
+      server api:3000;
+  }
+
+  upstream frontend {
+      server frontend:80;
+  }
+
+  # Redirect HTTP → HTTPS
+  server {
+      listen 80;
+      server_name ton-domaine.com;
+      return 301 https://$host$request_uri;
+  }
+
+  server {
+      listen 443 ssl;
+      server_name ton-domaine.com;
+
+      ssl_certificate /etc/letsencrypt/live/ton-domaine.com/fullchain.pem;
+      ssl_certificate_key /etc/letsencrypt/live/ton-domaine.com/privkey.pem;
+      ssl_protocols TLSv1.2 TLSv1.3;
+
+      # API REST
+      location /api/ {
+          proxy_pass http://api/api/;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection 'upgrade';
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_cache_bypass $http_upgrade;
+      }
+
+      # WebSocket Socket.IO
+      location /socket.io/ {
+          proxy_pass http://api/socket.io/;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection 'upgrade';
+          proxy_set_header Host $host;
+      }
+
+      # Frontend Angular
+      location / {
+          proxy_pass http://frontend/;
+          proxy_set_header Host $host;
+      }
+  }
+
+
+ÉTAPE 9 — SSL AVEC LET'S ENCRYPT (si domaine)
+----------------------------------------------
+
+9a. Pointer le DNS
+Dans ton gestionnaire DNS, ajouter un enregistrement A :
+  ton-domaine.com → <IP_PUBLIQUE_ORACLE>
+
+Vérifier la propagation (~5-30 min) :
+  nslookup ton-domaine.com
+  # doit retourner l'IP Oracle
+
+9b. Obtenir le certificat
+  sudo apt install -y certbot
+
+  # Le port 80 doit être libre — avant docker-compose up
+  sudo certbot certonly --standalone -d ton-domaine.com
+
+Le certificat est généré dans /etc/letsencrypt/live/ton-domaine.com/
+
+9c. Monter les certificats dans le container Nginx
+Modifier docker-compose.yml, section nginx :
+
+  nginx:
+    image: nginx:alpine
+    container_name: stravaxp_nginx
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - api
+      - frontend
+
+9d. Renouvellement automatique
+  # Tester le renouvellement
+  sudo certbot renew --dry-run
+
+  # Cron : renouveler tous les jours à 3h et recharger nginx
+  (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet && docker restart stravaxp_nginx") | crontab -
+
+
+ÉTAPE 10 — LANCER L'APPLICATION
+---------------------------------
+
+  # Build et démarrage de tous les services
+  docker compose up -d --build
+
+  # Suivre les logs en temps réel
+  docker compose logs -f
+
+  # Vérifier que tout tourne
+  docker compose ps
+
+Résultat attendu :
+  NAME                STATUS
+  stravaxp_db         Up (healthy)
+  stravaxp_api        Up
+  stravaxp_frontend   Up
+  stravaxp_nginx      Up
+
+Tester dans le navigateur : http://<IP> ou https://ton-domaine.com
+
+
+ÉTAPE 11 — DÉSACTIVER DB_SYNC
+-------------------------------
+
+Une fois le premier démarrage réussi (tables créées automatiquement) :
+
+  nano backend/.env
+  # Changer DB_SYNC=true → DB_SYNC=false
+
+  docker compose restart api
+
+
+ÉTAPE 12 — CONFIGURER LE WEBHOOK STRAVA
+-----------------------------------------
+
+12a. Mettre à jour l'app Strava
+Sur strava.com/settings/api :
+  Authorization Callback Domain: ton-domaine.com
+
+12b. Enregistrer le webhook
+  curl -X POST https://www.strava.com/api/v3/push_subscriptions \
+    -F client_id=TON_CLIENT_ID \
+    -F client_secret=TON_CLIENT_SECRET \
+    -F callback_url=https://ton-domaine.com/api/webhooks/strava \
+    -F verify_token=TON_STRAVA_WEBHOOK_VERIFY_TOKEN
+
+Réponse attendue : {"id": 12345}
+
+12c. Vérifier le webhook
+  curl "https://ton-domaine.com/api/webhooks/strava?hub.mode=subscribe&hub.verify_token=TON_TOKEN&hub.challenge=test123"
+  # {"hub.challenge":"test123"}
+
+
+COMMANDES UTILES
+-----------------
+
+  # Logs d'un service spécifique
+  docker compose logs -f api
+  docker compose logs -f db
+
+  # Redémarrer un service
+  docker compose restart api
+
+  # Mettre à jour après un git pull
+  git pull
+  docker compose up -d --build
+
+  # Accéder à la base de données
+  docker exec -it stravaxp_db psql -U stravaxp_user -d stravaxp
+
+  # Lancer les migrations manuellement
+  docker exec stravaxp_api npm run migration:run
+
+  # Espace disque utilisé
+  docker system df
+
+
+RÉSUMÉ DES RESSOURCES ORACLE UTILISÉES
+----------------------------------------
+
+  Ressource          | Utilisé          | Limite gratuite
+  VM A1.Flex         | 4 OCPU / 24 GB   | 4 OCPU / 24 GB RAM
+  Block Storage      | ~50 GB           | 200 GB
+  Bande passante     | Variable         | 10 TB/mois
+
+100% dans le free tier permanent d'Oracle Cloud — aucune expiration contrairement à AWS/GCP.

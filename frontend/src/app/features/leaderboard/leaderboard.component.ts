@@ -13,13 +13,17 @@ import { environment } from '../../../environments/environment';
     <div class="leaderboard-page">
       <!-- Tabs -->
       <div class="tabs-bar">
-        <button class="tab" [class.active]="activeTab() === 'global'" (click)="activeTab.set('global')">
-          Global
+        <button class="tab" [class.active]="activeTab() === 'global'" (click)="setTab('global')">
+          🌍 Global
           @if (activeTab() === 'global') { <span class="tab-indicator"></span> }
         </button>
-        <button class="tab" [class.active]="activeTab() === 'region'" (click)="setRegionTab()">
-          Ma région
-          @if (activeTab() === 'region') { <span class="tab-indicator"></span> }
+        <button class="tab" [class.active]="activeTab() === 'run'" (click)="setTab('run')">
+          🏃 Course
+          @if (activeTab() === 'run') { <span class="tab-indicator"></span> }
+        </button>
+        <button class="tab" [class.active]="activeTab() === 'bike'" (click)="setTab('bike')">
+          🚴 Vélo
+          @if (activeTab() === 'bike') { <span class="tab-indicator"></span> }
         </button>
       </div>
 
@@ -32,7 +36,7 @@ import { environment } from '../../../environments/environment';
               <img class="podium-avatar silver" [src]="top3()[1].avatarUrl || 'assets/avatar-default.png'" [alt]="top3()[1].firstName" />
               <div class="podium-rank silver-rank">2</div>
               <div class="podium-name">{{ top3()[1].firstName }}</div>
-              <div class="podium-pts silver-pts">{{ top3()[1].xpTotal | number }} XP</div>
+              <div class="podium-pts silver-pts">{{ xp(top3()[1]) | number }} XP</div>
             </div>
             <!-- 1st place -->
             <div class="podium-item podium-first">
@@ -40,14 +44,14 @@ import { environment } from '../../../environments/environment';
               <img class="podium-avatar gold" [src]="top3()[0].avatarUrl || 'assets/avatar-default.png'" [alt]="top3()[0].firstName" />
               <div class="podium-rank gold-rank">1</div>
               <div class="podium-name">{{ top3()[0].firstName }}</div>
-              <div class="podium-pts gold-pts">{{ top3()[0].xpTotal | number }} XP</div>
+              <div class="podium-pts gold-pts">{{ xp(top3()[0]) | number }} XP</div>
             </div>
             <!-- 3rd place -->
             <div class="podium-item">
               <img class="podium-avatar bronze" [src]="top3()[2].avatarUrl || 'assets/avatar-default.png'" [alt]="top3()[2].firstName" />
               <div class="podium-rank bronze-rank">3</div>
               <div class="podium-name">{{ top3()[2].firstName }}</div>
-              <div class="podium-pts bronze-pts">{{ top3()[2].xpTotal | number }} XP</div>
+              <div class="podium-pts bronze-pts">{{ xp(top3()[2]) | number }} XP</div>
             </div>
           </div>
         }
@@ -71,7 +75,7 @@ import { environment } from '../../../environments/environment';
                 </div>
               </div>
               <div class="rank-xp">
-                <div class="xp-value">{{ entry.xpTotal | number }}</div>
+                <div class="xp-value">{{ xp(entry) | number }}</div>
                 <div class="xp-label">XP</div>
               </div>
             </div>
@@ -287,31 +291,37 @@ import { environment } from '../../../environments/environment';
 })
 export class LeaderboardComponent implements OnInit {
   entries = signal<any[]>([]);
-  activeTab = signal<'global' | 'region'>('global');
+  activeTab = signal<'global' | 'run' | 'bike'>('global');
 
   top3 = computed(() => this.entries().length >= 3 ? this.entries().slice(0, 3) : []);
   rest = computed(() => this.entries().length >= 3 ? this.entries().slice(3) : this.entries());
 
+
   constructor(public auth: AuthService, private http: HttpClient) {}
 
   ngOnInit() {
-    this.loadLeaderboard();
+    this.loadLeaderboard('global');
   }
 
-  setRegionTab() {
-    this.activeTab.set('region');
-    const region = this.auth.currentUser()?.region;
-    this.loadLeaderboard(region);
+  setTab(tab: 'global' | 'run' | 'bike') {
+    this.activeTab.set(tab);
+    this.loadLeaderboard(tab);
   }
 
-  loadLeaderboard(region?: string) {
-    const params = region ? `?region=${encodeURIComponent(region)}` : '';
-    this.http.get<any[]>(`${environment.apiUrl}/api/users/leaderboard${params}`).subscribe({
+  loadLeaderboard(category: 'global' | 'run' | 'bike') {
+    this.http.get<any[]>(`${environment.apiUrl}/api/users/leaderboard?category=${category}`).subscribe({
       next: (data) => this.entries.set(data),
     });
   }
 
   level(xp: number): number {
     return getLevelFromXP(xp ?? 0);
+  }
+
+  xp(entry: any): number {
+    const tab = this.activeTab();
+    if (tab === 'run') return entry.xpRun ?? 0;
+    if (tab === 'bike') return entry.xpBike ?? 0;
+    return entry.xpTotal ?? 0;
   }
 }

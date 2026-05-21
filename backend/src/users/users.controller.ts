@@ -11,8 +11,9 @@ export class UsersController {
   getLeaderboard(
     @Query('region') region?: string,
     @Query('period') period?: 'month' | 'global',
+    @Query('category') category?: 'global' | 'run' | 'bike',
   ) {
-    return this.usersService.getLeaderboard(region, period);
+    return this.usersService.getLeaderboard(region, period, category ?? 'global');
   }
 
   @Get(':id')

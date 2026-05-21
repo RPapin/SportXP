@@ -15,6 +15,9 @@ const ALLOWED_SPORT_TYPES = new Set([
   'Run', 'TrailRun',
 ]);
 
+const BIKE_SPORT_TYPES = new Set(['Ride', 'MountainBikeRide', 'GravelRide']);
+const RUN_SPORT_TYPES = new Set(['Run', 'TrailRun']);
+
 @Injectable()
 export class ActivitiesService {
   private readonly logger = new Logger(ActivitiesService.name);
@@ -122,9 +125,15 @@ export class ActivitiesService {
     activity.polyline = polyline;
     activity.startDate = stravaData.start_date ? new Date(stravaData.start_date) : (null as unknown as Date);
 
+    const sportType: string = stravaData.sport_type;
+    const isBike = BIKE_SPORT_TYPES.has(sportType);
+    const isRun = RUN_SPORT_TYPES.has(sportType);
+
     await this.dataSource.transaction(async (manager) => {
       await manager.save(activity);
       await manager.increment(User, { id: user.id }, 'xpTotal', xpEarned);
+      if (isBike) await manager.increment(User, { id: user.id }, 'xpBike', xpEarned);
+      if (isRun) await manager.increment(User, { id: user.id }, 'xpRun', xpEarned);
       await manager.save(
         manager.create(XpLog, {
           userId: user.id,

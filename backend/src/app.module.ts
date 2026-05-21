@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { AchievementsModule } from './achievements/achievements.module';
 import { AdminModule } from './admin/admin.module';
 import { WebsocketModule } from './websocket/websocket.module';
+import { InteractionsModule } from './interactions/interactions.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { WebsocketModule } from './websocket/websocket.module';
     AchievementsModule,
     AdminModule,
     WebsocketModule,
+    InteractionsModule,
   ],
 })
 export class AppModule {}

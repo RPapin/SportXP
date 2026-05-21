@@ -9,6 +9,7 @@ import { WebhookController } from './webhook.controller';
 import { AchievementsModule } from '../achievements/achievements.module';
 import { WebsocketModule } from '../websocket/websocket.module';
 import { AuthModule } from '../auth/auth.module';
+import { InteractionsModule } from '../interactions/interactions.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AuthModule } from '../auth/auth.module';
     AchievementsModule,
     WebsocketModule,
     AuthModule,
+    InteractionsModule,
   ],
   controllers: [ActivitiesController, WebhookController],
   providers: [ActivitiesService],

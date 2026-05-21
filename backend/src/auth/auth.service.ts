@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { User } from '../database/entities/user.entity';
+import { User, UserRole } from '../database/entities/user.entity';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 
@@ -29,6 +29,12 @@ export class AuthService {
   ) {}
 
   async upsertUser(dto: UpsertUserDto): Promise<User> {
+    const adminIds = new Set(
+      (this.config.get<string>('ADMIN_STRAVA_IDS') ?? '')
+        .split(',').map(s => s.trim()).filter(Boolean),
+    );
+    const isAdmin = adminIds.has(String(dto.stravaId));
+
     let user = await this.userRepo.findOne({ where: { stravaId: dto.stravaId } });
 
     if (user) {
@@ -44,10 +50,11 @@ export class AuthService {
         stravaRefreshToken: dto.stravaRefreshToken,
         tokenExpiresAt: dto.tokenExpiresAt,
       });
+      if (isAdmin) user.role = UserRole.ADMIN;
       return this.userRepo.save(user);
     }
 
-    user = this.userRepo.create(dto);
+    user = this.userRepo.create({ ...dto, role: isAdmin ? UserRole.ADMIN : UserRole.ATHLETE });
     return this.userRepo.save(user);
   }
 

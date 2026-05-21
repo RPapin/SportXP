@@ -12,7 +12,11 @@
       "Bash(Sort-Object FullName)",
       "Bash(New-Item -ItemType Directory -Force \"D:\\\\IdeaProjects\\\\ObjectifMilliard\\\\frontend\\\\src\\\\app\\\\features\\\\club\")",
       "Bash(Out-Null)",
-      "PowerShell(New-Item *)"
+      "PowerShell(New-Item *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\IdeaProjects\\\\SportXP\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(Get-ChildItem -Path \"D:\\\\IdeaProjects\\\\SportXP\" -Directory)",
+      "Bash(Select-Object Name)"
     ]
   }
 }

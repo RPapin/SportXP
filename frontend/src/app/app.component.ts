@@ -22,9 +22,6 @@ const PAGE_TITLES: Record<string, string> = {
       @if (showNav()) {
         <header class="app-header">
           <h1 class="header-title">{{ pageTitle() }}</h1>
-          @if (auth.isLoggedIn() && auth.isAdmin()) {
-            <a class="admin-link" routerLink="/admin">Admin</a>
-          }
         </header>
       }
 
@@ -76,6 +73,14 @@ const PAGE_TITLES: Record<string, string> = {
             </svg>
             <span>Club</span>
           </a>
+          @if (auth.isLoggedIn() && auth.isAdmin()) {
+            <a class="nav-item nav-item--admin" routerLink="/admin" routerLinkActive="active">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              <span>Admin</span>
+            </a>
+          }
         </nav>
       }
     </div>
@@ -102,7 +107,6 @@ const PAGE_TITLES: Record<string, string> = {
       padding: 14px 24px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
       z-index: 10;
     }
 
@@ -111,15 +115,6 @@ const PAGE_TITLES: Record<string, string> = {
       font-weight: 600;
       color: #111827;
       margin: 0;
-    }
-
-    .admin-link {
-      font-size: 0.75rem;
-      font-weight: 500;
-      color: #2563eb;
-      background: #eff6ff;
-      padding: 4px 10px;
-      border-radius: 999px;
     }
 
     .content-area {
@@ -156,11 +151,12 @@ const PAGE_TITLES: Record<string, string> = {
       flex-direction: column;
       align-items: center;
       gap: 2px;
-      padding: 8px 16px;
+      padding: 8px 10px;
       border-radius: 8px;
       color: #6b7280;
       transition: color 0.15s, background 0.15s;
       cursor: pointer;
+      min-width: 0;
     }
 
     .nav-item:hover {
@@ -169,7 +165,7 @@ const PAGE_TITLES: Record<string, string> = {
     }
 
     .nav-item span {
-      font-size: 0.68rem;
+      font-size: 0.65rem;
       font-weight: 500;
     }
 
@@ -181,6 +177,10 @@ const PAGE_TITLES: Record<string, string> = {
     .nav-item.active {
       color: #2563eb;
     }
+
+    .nav-item--admin { color: #9ca3af; }
+    .nav-item--admin:hover { color: #e67e22; background: #fff7ed; }
+    .nav-item--admin.active { color: #e67e22; }
   `],
 })
 export class AppComponent {

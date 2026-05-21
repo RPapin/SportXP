@@ -1,4 +1,3 @@
-
 import {
   Controller, Get, Patch, Delete, Post, Param, Body, UseGuards,
 } from '@nestjs/common';
@@ -20,13 +19,21 @@ export class AdminController {
   }
 
   @Patch('users/:id')
-  updateUser(@Param('id') id: string, @Body() body: { role?: UserRole; isActive?: boolean }) {
+  updateUser(
+    @Param('id') id: string,
+    @Body() body: { role?: UserRole; isActive?: boolean; firstName?: string; lastName?: string; region?: string },
+  ) {
     return this.adminService.updateUser(id, body);
   }
 
   @Delete('users/:id')
   deleteUser(@Param('id') id: string) {
     return this.adminService.deleteUser(id);
+  }
+
+  @Post('recalculate-xp')
+  recalculateXP() {
+    return this.adminService.recalculateAllXP();
   }
 
   @Get('stats')

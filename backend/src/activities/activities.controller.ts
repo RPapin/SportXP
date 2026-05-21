@@ -2,18 +2,32 @@ import {
   Controller, Get, Post, Query, Req, UseGuards, HttpCode,
 } from '@nestjs/common';
 import { ActivitiesService } from './activities.service';
+import { InteractionsService } from '../interactions/interactions.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 
 @Controller('api/activities')
 export class ActivitiesController {
-  constructor(private activitiesService: ActivitiesService) {}
+  constructor(
+    private activitiesService: ActivitiesService,
+    private interactionsService: InteractionsService,
+  ) {}
 
   @Get()
-  getFeed(
+  @UseGuards(OptionalJwtAuthGuard)
+  async getFeed(
     @Query('limit') limit = '20',
     @Query('offset') offset = '0',
+    @Req() req: any,
   ) {
-    return this.activitiesService.getFeed(+limit, +offset);
+    const userId: string | undefined = req.user?.id;
+    const activities = await this.activitiesService.getFeed(+limit, +offset);
+    const ids = activities.map((a) => a.id);
+    const meta = await this.interactionsService.getFeedMeta(ids, userId);
+    return activities.map((a) => ({
+      ...a,
+      ...(meta.get(a.id) ?? { likesCount: 0, commentsCount: 0, likedByMe: false }),
+    }));
   }
 
   @Get('map')
