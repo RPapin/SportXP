@@ -4,13 +4,23 @@ Application web qui gamifie les activités Strava en attribuant des XP basés su
 
 ## Stack
 
+### Technique
+
 | Couche | Technologie |
 |--------|------------|
 | Frontend | Angular 17 standalone, Angular Material, Leaflet.js |
-| Backend | NestJS, TypeORM, Passport.js OAuth2 Strava |
+| Backend | NestJS, TypeORM |
 | Base de données | PostgreSQL 16 + PostGIS 3 |
 | Auth | OAuth 2.0 Strava (JWT) |
-| Infra | Docker Compose |
+| Infra locale | Docker Compose |
+
+### Déploiement (production)
+
+| Service | Plateforme | URL |
+|---------|-----------|-----|
+| Frontend | [Vercel](https://vercel.com) | déployé depuis `frontend/` |
+| Backend | [Render](https://render.com) | `https://sportxp.onrender.com` |
+| Base de données | [Supabase](https://supabase.com) | PostgreSQL managé avec extension PostGIS |
 
 ## Première installation
 

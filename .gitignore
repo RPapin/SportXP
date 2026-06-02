@@ -8,7 +8,6 @@ build/
 
 # Environment files — ne jamais committer les secrets
 backend/.env
-frontend/src/environments/environment.prod.ts
 
 # Logs
 *.log
