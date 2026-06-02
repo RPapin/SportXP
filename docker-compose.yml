@@ -44,6 +44,9 @@ services:
       - '4200:80'
     depends_on:
       - api
+    environment:
+      API_URL: http://localhost
+      WS_URL: http://localhost
 
   nginx:
     image: nginx:alpine

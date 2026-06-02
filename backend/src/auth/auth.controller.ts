@@ -1,5 +1,4 @@
-import { Controller, Get, Req, Res, UseGuards } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { Controller, Get, Param, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -13,14 +12,49 @@ export class AuthController {
   ) {}
 
   @Get('strava')
-  @UseGuards(AuthGuard('strava'))
-  stravaAuth() {}
+  async stravaAuth(@Query('slot') slotQuery: string, @Res() res: Response) {
+    const slotHint = slotQuery ? parseInt(slotQuery, 10) : undefined;
+    const slot = await this.authService.getAvailableSlot(slotHint);
 
-  @Get('strava/callback')
-  @UseGuards(AuthGuard('strava'))
-  stravaCallback(@Req() req: any, @Res() res: Response) {
-    const token = this.authService.generateJWT(req.user);
+    if (!slot) {
+      const frontendUrl = this.config.get<string>('FRONTEND_URL');
+      return res.redirect(`${frontendUrl}/auth/error?reason=capacity`);
+    }
+
+    const { clientId } = this.authService.getKeyConfig(slot);
+    const apiUrl = this.config.get<string>('API_URL');
+    const callbackUrl = `${apiUrl}/api/auth/strava/${slot}/callback`;
+
+    const authUrl = new URL('https://www.strava.com/oauth/authorize');
+    authUrl.searchParams.set('client_id', clientId);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('redirect_uri', callbackUrl);
+    authUrl.searchParams.set('scope', 'activity:read_all');
+    authUrl.searchParams.set('approval_prompt', 'auto');
+
+    return res.redirect(authUrl.toString());
+  }
+
+  @Get('strava/:slot/callback')
+  async stravaCallback(
+    @Param('slot') slotParam: string,
+    @Query('code') code: string,
+    @Query('error') error: string,
+    @Res() res: Response,
+  ) {
     const frontendUrl = this.config.get<string>('FRONTEND_URL');
+
+    if (error || !code) {
+      return res.redirect(`${frontendUrl}/auth/error?reason=denied`);
+    }
+
+    const slot = parseInt(slotParam, 10);
+    if (isNaN(slot) || slot < 1 || slot > 4) {
+      return res.redirect(`${frontendUrl}/auth/error`);
+    }
+
+    const user = await this.authService.handleStravaCallback(code, slot);
+    const token = this.authService.generateJWT(user);
     return res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
   }
 

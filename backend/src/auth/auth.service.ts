@@ -28,7 +28,69 @@ export class AuthService {
     private config: ConfigService,
   ) {}
 
-  async upsertUser(dto: UpsertUserDto): Promise<User> {
+  getKeyConfig(slot: number): { clientId: string; clientSecret: string } {
+    const clientId = this.config.get<string>(`STRAVA_CLIENT_ID_${slot}`);
+    const clientSecret = this.config.get<string>(`STRAVA_CLIENT_SECRET_${slot}`);
+    if (!clientId || !clientSecret) {
+      throw new Error(`Strava key slot ${slot} not configured`);
+    }
+    return { clientId, clientSecret };
+  }
+
+  async getAvailableSlot(slotHint?: number): Promise<number | null> {
+    // Returning users provide a hint — trust it directly
+    if (slotHint && slotHint >= 1 && slotHint <= 4) return slotHint;
+
+    const counts = await this.userRepo
+      .createQueryBuilder('u')
+      .select('u.stravaKeySlot', 'slot')
+      .addSelect('COUNT(*)', 'count')
+      .where('u.stravaKeySlot IS NOT NULL')
+      .groupBy('u.stravaKeySlot')
+      .getRawMany();
+
+    const countMap = new Map<number, number>();
+    for (const row of counts) {
+      countMap.set(Number(row.slot), Number(row.count));
+    }
+
+    for (let slot = 1; slot <= 4; slot++) {
+      if ((countMap.get(slot) ?? 0) < 10) return slot;
+    }
+    return null;
+  }
+
+  async handleStravaCallback(code: string, slot: number): Promise<User> {
+    const { clientId, clientSecret } = this.getKeyConfig(slot);
+
+    const { data } = await axios.post('https://www.strava.com/oauth/token', {
+      client_id: clientId,
+      client_secret: clientSecret,
+      code,
+      grant_type: 'authorization_code',
+    });
+
+    const athlete = data.athlete;
+
+    return this.upsertUser(
+      {
+        stravaId: athlete.id,
+        username: athlete.username,
+        firstName: athlete.firstname,
+        lastName: athlete.lastname,
+        avatarUrl: athlete.profile,
+        city: athlete.city,
+        region: athlete.state,
+        country: athlete.country,
+        stravaAccessToken: data.access_token,
+        stravaRefreshToken: data.refresh_token,
+        tokenExpiresAt: data.expires_at,
+      },
+      slot,
+    );
+  }
+
+  async upsertUser(dto: UpsertUserDto, slot?: number): Promise<User> {
     const adminIds = new Set(
       (this.config.get<string>('ADMIN_STRAVA_IDS') ?? '')
         .split(',').map(s => s.trim()).filter(Boolean),
@@ -51,10 +113,16 @@ export class AuthService {
         tokenExpiresAt: dto.tokenExpiresAt,
       });
       if (isAdmin) user.role = UserRole.ADMIN;
+      // Assign slot if it was never set (e.g. existing users before migration)
+      if (!user.stravaKeySlot && slot) user.stravaKeySlot = slot;
       return this.userRepo.save(user);
     }
 
-    user = this.userRepo.create({ ...dto, role: isAdmin ? UserRole.ADMIN : UserRole.ATHLETE });
+    user = this.userRepo.create({
+      ...dto,
+      role: isAdmin ? UserRole.ADMIN : UserRole.ATHLETE,
+      stravaKeySlot: slot,
+    });
     return this.userRepo.save(user);
   }
 
@@ -63,6 +131,7 @@ export class AuthService {
       sub: user.id,
       stravaId: user.stravaId,
       role: user.role,
+      stravaKeySlot: user.stravaKeySlot,
     });
   }
 
@@ -70,9 +139,13 @@ export class AuthService {
     const now = Math.floor(Date.now() / 1000);
     if (user.tokenExpiresAt > now) return user;
 
+    // Fall back to slot 1 for users created before this feature
+    const slot = user.stravaKeySlot ?? 1;
+    const { clientId, clientSecret } = this.getKeyConfig(slot);
+
     const { data } = await axios.post('https://www.strava.com/oauth/token', {
-      client_id: this.config.get('STRAVA_CLIENT_ID'),
-      client_secret: this.config.get('STRAVA_CLIENT_SECRET'),
+      client_id: clientId,
+      client_secret: clientSecret,
       grant_type: 'refresh_token',
       refresh_token: user.stravaRefreshToken,
     });

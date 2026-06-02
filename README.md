@@ -12,12 +12,55 @@ Application web qui gamifie les activités Strava en attribuant des XP basés su
 | Auth | OAuth 2.0 Strava (JWT) |
 | Infra | Docker Compose |
 
+## Première installation
+
+### Installer PostGIS sur PostgreSQL local
+
+PostGIS doit être installé au niveau système avant de pouvoir être activé dans la base de données.
+
+#### Via Stack Builder (recommandé sur Windows)
+
+1. Ouvrir **Stack Builder** (menu Démarrer → chercher "Stack Builder")
+2. Sélectionner votre instance PostgreSQL → Suivant
+3. Déplier **Spatial Extensions** → cocher **PostGIS** → Installer
+
+#### Via pgAdmin
+
+Une fois les fichiers installés, ouvrir **pgAdmin** → se connecter au serveur → clic droit sur la base `stravaxp` → **Query Tool**, puis exécuter :
+
+```sql
+CREATE EXTENSION IF NOT EXISTS postgis;
+```
+
+Vérification :
+
+```sql
+SELECT PostGIS_version();
+-- ex : 3.4 USE_GEOS=1 ...
+```
+
+#### Via la ligne de commande
+
+```bash
+psql -U stravaxp_user -d stravaxp -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+```
+
+#### Dépannage
+
+| Erreur | Solution |
+|--------|----------|
+| `could not open extension control file` | Les fichiers PostGIS ne sont pas installés — relancer Stack Builder |
+| `permission denied` | Se connecter en superutilisateur (`postgres`) pour exécuter `CREATE EXTENSION` |
+| Version incompatible | Vérifier que la version PostGIS correspond à celle de PostgreSQL (ex : PostGIS 3.4 pour PG 16) |
+
+---
+
 ## Démarrage rapide
 
 ### 1. Variables d'environnement
 
 ```bash
-cp backend/.env.example backend/.env
+cp backend/..env.example backend/..env
 # Remplir STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, JWT_SECRET
 ```
 
@@ -33,6 +76,11 @@ docker-compose up -d
 
 ### 3. Développement local
 
+**Base de données PostgreSQL + PostGIS :**
+```bash
+docker-compose up db -d
+```
+
 **Backend :**
 ```bash
 cd backend
@@ -45,11 +93,6 @@ npm run start:dev
 cd frontend
 npm install --legacy-peer-deps
 npm start
-```
-
-**Base de données PostgreSQL + PostGIS :**
-```bash
-docker-compose up db -d
 ```
 
 ## Formule XP

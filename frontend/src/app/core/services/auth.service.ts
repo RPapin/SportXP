@@ -22,20 +22,33 @@ export interface AuthUser {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly TOKEN_KEY = 'stravaxp_jwt';
+  private readonly SLOT_KEY = 'stravaxp_slot';
   currentUser = signal<AuthUser | null>(null);
 
   constructor(private http: HttpClient, private router: Router) {}
 
   loginWithStrava() {
-    window.location.href = `${environment.apiUrl}/api/auth/strava`;
+    const slot = localStorage.getItem(this.SLOT_KEY);
+    const url = slot
+      ? `${environment.apiUrl}/api/auth/strava?slot=${slot}`
+      : `${environment.apiUrl}/api/auth/strava`;
+    window.location.href = url;
   }
 
   handleCallback(token: string) {
     localStorage.setItem(this.TOKEN_KEY, token);
+    // Cache the slot from the JWT so returning users re-use the same Strava app
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1])) as { stravaKeySlot?: number };
+      if (payload.stravaKeySlot) {
+        localStorage.setItem(this.SLOT_KEY, String(payload.stravaKeySlot));
+      }
+    } catch { /* ignore malformed token */ }
   }
 
   logout() {
     localStorage.removeItem(this.TOKEN_KEY);
+    // Keep SLOT_KEY so the next login reuses the correct Strava app
     this.currentUser.set(null);
     this.router.navigate(['/home']);
   }

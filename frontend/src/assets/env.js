@@ -1,0 +1,6 @@
+(function (window) {
+  window.__env = {
+    apiUrl: '${API_URL}',
+    wsUrl: '${WS_URL}',
+  };
+})(window);

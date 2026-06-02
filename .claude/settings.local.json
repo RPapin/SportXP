@@ -20,7 +20,10 @@
       "Bash(Test-Path D:\\\\IdeaProjects\\\\SportXP\\\\backend\\\\Dockerfile *)",
       "Bash(vercel *)",
       "Bash(npm i *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(Get-ChildItem -Path \"E:\\\\SportXP\" -Force)",
+      "Bash(Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem -Path \"E:\\\\SportXP\\\\backend\" -Name | Where-Object { $_ -match \"\\\\.env|config|tsconfig\" })"
     ]
   }
 }

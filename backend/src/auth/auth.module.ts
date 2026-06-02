@@ -5,7 +5,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { StravaStrategy } from './strava.strategy';
 import { JwtStrategy } from './jwt.strategy';
 import { User } from '../database/entities/user.entity';
 
@@ -22,7 +21,7 @@ import { User } from '../database/entities/user.entity';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, StravaStrategy, JwtStrategy],
+  providers: [AuthService, JwtStrategy],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

@@ -61,6 +61,9 @@ export class User {
   @Column({ type: 'enum', enum: UserRole, default: UserRole.ATHLETE })
   role: UserRole;
 
+  @Column({ type: 'int', nullable: true, name: 'strava_key_slot' })
+  stravaKeySlot: number;
+
   @Column({ type: 'boolean', default: true, name: 'is_active' })
   isActive: boolean;
 
