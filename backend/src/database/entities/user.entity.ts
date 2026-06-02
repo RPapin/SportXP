@@ -64,6 +64,9 @@ export class User {
   @Column({ type: 'int', nullable: true, name: 'strava_key_slot' })
   stravaKeySlot: number;
 
+  @Column({ type: 'timestamp', nullable: true, name: 'last_sync_at' })
+  lastSyncAt: Date | null;
+
   @Column({ type: 'boolean', default: true, name: 'is_active' })
   isActive: boolean;
 

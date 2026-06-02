@@ -51,6 +51,12 @@ export class ActivitiesController {
     return this.activitiesService.getUserActivities(req.user.id);
   }
 
+  @Get('sync-status')
+  @UseGuards(JwtAuthGuard)
+  syncStatus(@Req() req: any) {
+    return this.activitiesService.getSyncStatus(req.user);
+  }
+
   @Post('sync-all')
   @UseGuards(JwtAuthGuard)
   @HttpCode(200)

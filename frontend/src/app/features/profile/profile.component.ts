@@ -3,6 +3,7 @@ import { CommonModule, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthService } from '../../core/services/auth.service';
+import { SyncProgressService } from '../../core/services/sync-progress.service';
 import { getLevelFromXP, getProgressPercent, getXPForLevel } from '../../shared/pipes/xp-level.pipe';
 import { environment } from '../../../environments/environment';
 
@@ -78,15 +79,22 @@ const SPORT_ICONS: Record<string, string> = {
 
         <!-- Sync Button -->
         <div class="sync-section">
-          <button class="sync-btn" (click)="syncActivities()" [disabled]="syncing()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <button class="sync-btn" (click)="syncActivities()" [disabled]="syncing() || !syncProgress.canSync()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" [class.spin]="syncing()">
               <path d="M21 2v6h-6"/>
               <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
               <path d="M3 22v-6h6"/>
               <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
             </svg>
-            {{ syncing() ? 'Synchronisation…' : 'Synchroniser mes activités Strava' }}
+            @if (syncing()) {
+              Synchronisation…
+            } @else if (syncProgress.cooldownSeconds() > 0) {
+              Disponible dans {{ syncProgress.formatCooldown(syncProgress.cooldownSeconds()) }}
+            } @else {
+              Synchroniser mes activités Strava
+            }
           </button>
+          <p class="sync-hint">190 activités max · disponible toutes les 15 min</p>
         </div>
 
         <!-- Achievements -->
@@ -309,6 +317,16 @@ const SPORT_ICONS: Record<string, string> = {
     .sync-btn:hover:not(:disabled) { opacity: 0.9; }
     .sync-btn:disabled { opacity: 0.6; cursor: default; }
 
+    .sync-hint {
+      text-align: center;
+      font-size: 0.72rem;
+      color: #9ca3af;
+      margin: 6px 0 0;
+    }
+
+    @keyframes spin-icon { to { transform: rotate(360deg); } }
+    .spin { animation: spin-icon 1s linear infinite; }
+
     /* Section */
     .section {
       background: white;
@@ -442,6 +460,7 @@ export class ProfileComponent implements OnInit {
 
   constructor(
     public auth: AuthService,
+    public syncProgress: SyncProgressService,
     private http: HttpClient,
     private snackBar: MatSnackBar,
   ) {}
@@ -449,6 +468,15 @@ export class ProfileComponent implements OnInit {
   ngOnInit() {
     this.loadActivities();
     this.loadAchievements();
+    this.loadSyncStatus();
+  }
+
+  private loadSyncStatus() {
+    this.http.get<{ canSync: boolean; secondsUntilSync: number }>(
+      `${environment.apiUrl}/api/activities/sync-status`,
+    ).subscribe({
+      next: ({ secondsUntilSync }) => this.syncProgress.initCooldown(secondsUntilSync),
+    });
   }
 
   level(xp: number): number   { return getLevelFromXP(xp ?? 0); }
@@ -469,20 +497,35 @@ export class ProfileComponent implements OnInit {
   }
 
   syncActivities() {
+    if (!this.syncProgress.canSync()) return;
     this.syncing.set(true);
-    this.http.post<{ imported: number; skipped: number }>(`${environment.apiUrl}/api/activities/sync-all`, {}).subscribe({
+    this.http.post<{ imported: number; skipped: number; remaining: number }>(
+      `${environment.apiUrl}/api/activities/sync-all`, {},
+    ).subscribe({
       next: (result) => {
-        this.snackBar.open(
-          `${result.imported} activité(s) importée(s)`,
-          '✕',
-          { duration: 4000 },
-        );
+        this.syncing.set(false);
         this.loadActivities();
-        this.syncing.set(false);
+        if (result.remaining > 0) {
+          this.snackBar.open(
+            `${result.imported} importée(s) · ${result.remaining} restante(s) — sync à nouveau dans 15 min`,
+            '✕',
+            { duration: 6000 },
+          );
+        }
       },
-      error: () => {
-        this.snackBar.open('Erreur lors de la synchronisation', '✕', { duration: 3000 });
+      error: (err) => {
         this.syncing.set(false);
+        if (err.status === 429) {
+          const secs: number = err.error?.secondsUntilSync ?? 900;
+          this.syncProgress.initCooldown(secs);
+          this.snackBar.open(
+            `Limite atteinte — sync disponible dans ${this.syncProgress.formatCooldown(secs)}`,
+            '✕',
+            { duration: 4000 },
+          );
+        } else {
+          this.snackBar.open('Erreur lors de la synchronisation', '✕', { duration: 3000 });
+        }
       },
     });
   }

@@ -25,4 +25,16 @@ export class EventsGateway implements OnGatewayInit {
   emitAchievementUnlocked(userId: string, achievement: any) {
     this.server.emit('achievement_unlocked', { userId, achievement });
   }
+
+  emitSyncStart(userId: string, total: number) {
+    this.server.emit('sync:start', { userId, total });
+  }
+
+  emitSyncProgress(userId: string, imported: number, total: number) {
+    this.server.emit('sync:progress', { userId, imported, total });
+  }
+
+  emitSyncDone(userId: string, imported: number, skipped: number, remaining: number) {
+    this.server.emit('sync:done', { userId, imported, skipped, remaining });
+  }
 }

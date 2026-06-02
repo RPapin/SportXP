@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Activity } from '../database/entities/activity.entity';
@@ -14,6 +14,9 @@ const ALLOWED_SPORT_TYPES = new Set([
   'Ride', 'MountainBikeRide', 'GravelRide',
   'Run', 'TrailRun',
 ]);
+
+const SYNC_BATCH_SIZE = 190;
+const SYNC_COOLDOWN_MS = 15 * 60 * 1000;
 
 const BIKE_SPORT_TYPES = new Set(['Ride', 'MountainBikeRide', 'GravelRide']);
 const RUN_SPORT_TYPES = new Set(['Run', 'TrailRun']);
@@ -53,7 +56,27 @@ export class ActivitiesService {
     await this.saveActivity(freshUser, stravaActivity);
   }
 
-  async syncAllActivities(user: User): Promise<{ imported: number; skipped: number }> {
+  getSyncStatus(user: User): { canSync: boolean; secondsUntilSync: number } {
+    if (!user.lastSyncAt) return { canSync: true, secondsUntilSync: 0 };
+    const elapsed = Date.now() - new Date(user.lastSyncAt).getTime();
+    const remaining = SYNC_COOLDOWN_MS - elapsed;
+    if (remaining <= 0) return { canSync: true, secondsUntilSync: 0 };
+    return { canSync: false, secondsUntilSync: Math.ceil(remaining / 1000) };
+  }
+
+  async syncAllActivities(user: User): Promise<{ imported: number; skipped: number; remaining: number }> {
+    // Enforce 15-minute cooldown
+    const status = this.getSyncStatus(user);
+    if (!status.canSync) {
+      throw new HttpException(
+        { message: 'Rate limit', secondsUntilSync: status.secondsUntilSync },
+        429,
+      );
+    }
+
+    // Mark sync start time immediately to prevent concurrent calls
+    await this.userRepo.update(user.id, { lastSyncAt: new Date() });
+
     const freshUser = await this.authService.refreshStravaToken(user);
 
     // 1. Récupérer toute la liste des activités
@@ -75,6 +98,13 @@ export class ActivitiesService {
 
     // 3. Identifier en une seule requête celles déjà importées
     const eligibleIds = eligible.map(a => a.id);
+
+    if (eligibleIds.length === 0) {
+      this.eventsGateway.emitSyncStart(user.id, 0);
+      this.eventsGateway.emitSyncDone(user.id, 0, allActivities.length, 0);
+      return { imported: 0, skipped: allActivities.length, remaining: 0 };
+    }
+
     const existing = await this.activityRepo
       .createQueryBuilder('a')
       .select('a.stravaActivityId')
@@ -84,18 +114,26 @@ export class ActivitiesService {
     const toImport = eligible.filter(a => !existingIds.has(a.id));
     const skipped = allActivities.length - toImport.length;
 
-    // 4. Fetcher les détails uniquement pour les nouvelles activités
+    // 4. Cap at SYNC_BATCH_SIZE — remaining will be importable after the cooldown
+    const batch = toImport.slice(0, SYNC_BATCH_SIZE);
+    const remaining = toImport.length - batch.length;
+
+    this.eventsGateway.emitSyncStart(user.id, batch.length);
+
+    // 5. Importer avec progression en temps réel
     let imported = 0;
-    for (const activity of toImport) {
+    for (const activity of batch) {
       const { data: detailed } = await axios.get(
         `https://www.strava.com/api/v3/activities/${activity.id}`,
         { headers: { Authorization: `Bearer ${freshUser.stravaAccessToken}` } },
       );
       await this.saveActivity(freshUser, detailed);
       imported++;
+      this.eventsGateway.emitSyncProgress(user.id, imported, batch.length);
     }
 
-    return { imported, skipped };
+    this.eventsGateway.emitSyncDone(user.id, imported, skipped, remaining);
+    return { imported, skipped, remaining };
   }
 
   private async saveActivity(user: User, stravaData: any): Promise<Activity | null> {

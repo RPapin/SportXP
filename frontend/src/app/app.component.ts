@@ -3,6 +3,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } fro
 import { CommonModule } from '@angular/common';
 import { filter } from 'rxjs/operators';
 import { AuthService } from './core/services/auth.service';
+import { SyncProgressBarComponent } from './shared/components/sync-progress-bar.component';
 
 const PAGE_TITLES: Record<string, string> = {
   '/home': 'Actualités',
@@ -16,7 +17,7 @@ const PAGE_TITLES: Record<string, string> = {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, CommonModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, CommonModule, SyncProgressBarComponent],
   template: `
     <div class="app-shell">
       @if (showNav()) {
@@ -28,6 +29,8 @@ const PAGE_TITLES: Record<string, string> = {
       <div class="content-area" [class.no-nav]="!showNav()">
         <router-outlet />
       </div>
+
+      <app-sync-progress-bar />
 
       @if (showNav()) {
         <nav class="bottom-nav">
