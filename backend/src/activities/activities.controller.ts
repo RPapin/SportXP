@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Query, Req, UseGuards, HttpCode,
+  Controller, Get, Param, Post, Query, Req, UseGuards, HttpCode,
 } from '@nestjs/common';
 import { ActivitiesService } from './activities.service';
 import { InteractionsService } from '../interactions/interactions.service';
@@ -49,6 +49,12 @@ export class ActivitiesController {
   @UseGuards(JwtAuthGuard)
   getMine(@Req() req: any) {
     return this.activitiesService.getUserActivities(req.user.id);
+  }
+
+  @Get('user/:id')
+  @UseGuards(JwtAuthGuard)
+  getUserActivities(@Param('id') id: string) {
+    return this.activitiesService.getUserActivities(id);
   }
 
   @Get('sync-status')

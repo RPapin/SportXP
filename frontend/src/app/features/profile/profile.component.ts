@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -67,15 +67,31 @@ const SPORT_ICONS: Record<string, string> = {
             <div class="stat-value">{{ user.xpTotal | number }}</div>
             <div class="stat-label">XP Total</div>
           </div>
-          <div class="stat-card">
-            <div class="stat-value">{{ activities().length }}</div>
-            <div class="stat-label">Activités</div>
+          <div class="stat-card" [class.stat-incomplete]="isImportIncomplete()">
+            <div class="stat-value">
+              {{ activities().length }}
+              @if (isImportIncomplete()) {
+                <span class="stat-total">/ {{ stravaEligibleCount() }}</span>
+              }
+            </div>
+            <div class="stat-label">Activités{{ isImportIncomplete() ? ' importées' : '' }}</div>
           </div>
           <div class="stat-card">
             <div class="stat-value">{{ totalKm() | number:'1.0-0' }}</div>
             <div class="stat-label">km parcourus</div>
           </div>
         </div>
+
+        <!-- Banner import incomplet -->
+        @if (isImportIncomplete()) {
+          <div class="import-banner">
+            <span class="import-banner-icon">⚠️</span>
+            <div class="import-banner-text">
+              <strong>{{ stravaEligibleCount()! - activities().length }} activités Strava non importées</strong>
+              <span>Lance une synchronisation pour les récupérer</span>
+            </div>
+          </div>
+        }
 
         <!-- Sync Button -->
         <div class="sync-section">
@@ -324,6 +340,41 @@ const SPORT_ICONS: Record<string, string> = {
       margin: 6px 0 0;
     }
 
+    .stat-incomplete {
+      border: 1.5px solid #fbbf24;
+    }
+
+    .stat-total {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #f59e0b;
+      margin-left: 2px;
+    }
+
+    .import-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 12px 12px;
+      padding: 10px 14px;
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-radius: 10px;
+    }
+
+    .import-banner-icon { font-size: 1.2rem; flex-shrink: 0; }
+
+    .import-banner-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      font-size: 0.82rem;
+      color: #92400e;
+    }
+
+    .import-banner-text strong { font-weight: 600; }
+    .import-banner-text span { color: #b45309; font-size: 0.75rem; }
+
     @keyframes spin-icon { to { transform: rotate(360deg); } }
     .spin { animation: spin-icon 1s linear infinite; }
 
@@ -457,6 +508,12 @@ export class ProfileComponent implements OnInit {
   activities = signal<any[]>([]);
   userAchievements = signal<any[]>([]);
   syncing = signal(false);
+  stravaEligibleCount = signal<number | null>(null);
+
+  isImportIncomplete = computed(() => {
+    const total = this.stravaEligibleCount();
+    return total !== null && total > this.activities().length;
+  });
 
   constructor(
     public auth: AuthService,
@@ -472,10 +529,13 @@ export class ProfileComponent implements OnInit {
   }
 
   private loadSyncStatus() {
-    this.http.get<{ canSync: boolean; secondsUntilSync: number }>(
+    this.http.get<{ canSync: boolean; secondsUntilSync: number; stravaEligibleCount: number | null }>(
       `${environment.apiUrl}/api/activities/sync-status`,
     ).subscribe({
-      next: ({ secondsUntilSync }) => this.syncProgress.initCooldown(secondsUntilSync),
+      next: ({ secondsUntilSync, stravaEligibleCount }) => {
+        this.syncProgress.initCooldown(secondsUntilSync);
+        this.stravaEligibleCount.set(stravaEligibleCount ?? null);
+      },
     });
   }
 
@@ -505,6 +565,7 @@ export class ProfileComponent implements OnInit {
       next: (result) => {
         this.syncing.set(false);
         this.loadActivities();
+        this.loadSyncStatus();
         if (result.remaining > 0) {
           this.snackBar.open(
             `${result.imported} importée(s) · ${result.remaining} restante(s) — sync à nouveau dans 15 min`,

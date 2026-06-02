@@ -1,6 +1,7 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { getLevelFromXP } from '../../shared/pipes/xp-level.pipe';
 import { environment } from '../../../environments/environment';
@@ -32,14 +33,14 @@ import { environment } from '../../../environments/environment';
         @if (top3().length === 3) {
           <div class="podium">
             <!-- 2nd place -->
-            <div class="podium-item">
+            <div class="podium-item clickable" (click)="goToProfile(top3()[1].id)">
               <img class="podium-avatar silver" [src]="top3()[1].avatarUrl || 'assets/avatar-default.png'" [alt]="top3()[1].firstName" />
               <div class="podium-rank silver-rank">2</div>
               <div class="podium-name">{{ top3()[1].firstName }}</div>
               <div class="podium-pts silver-pts">{{ xp(top3()[1]) | number }} XP</div>
             </div>
             <!-- 1st place -->
-            <div class="podium-item podium-first">
+            <div class="podium-item podium-first clickable" (click)="goToProfile(top3()[0].id)">
               <div class="crown">👑</div>
               <img class="podium-avatar gold" [src]="top3()[0].avatarUrl || 'assets/avatar-default.png'" [alt]="top3()[0].firstName" />
               <div class="podium-rank gold-rank">1</div>
@@ -47,7 +48,7 @@ import { environment } from '../../../environments/environment';
               <div class="podium-pts gold-pts">{{ xp(top3()[0]) | number }} XP</div>
             </div>
             <!-- 3rd place -->
-            <div class="podium-item">
+            <div class="podium-item clickable" (click)="goToProfile(top3()[2].id)">
               <img class="podium-avatar bronze" [src]="top3()[2].avatarUrl || 'assets/avatar-default.png'" [alt]="top3()[2].firstName" />
               <div class="podium-rank bronze-rank">3</div>
               <div class="podium-name">{{ top3()[2].firstName }}</div>
@@ -59,7 +60,7 @@ import { environment } from '../../../environments/environment';
         <!-- Ranked List -->
         <div class="rank-list">
           @for (entry of rest(); track entry.id) {
-            <div class="rank-row" [class.is-me]="entry.id === auth.currentUser()?.id">
+            <div class="rank-row" [class.is-me]="entry.id === auth.currentUser()?.id" (click)="goToProfile(entry.id)">
               <div class="rank-number" [class.top-rank]="entry.rank <= 3">{{ entry.rank }}</div>
               <img class="rank-avatar" [src]="entry.avatarUrl || 'assets/avatar-default.png'" [alt]="entry.firstName" />
               <div class="rank-info">
@@ -152,6 +153,9 @@ import { environment } from '../../../environments/environment';
       flex: 1;
     }
 
+    .clickable { cursor: pointer; }
+    .clickable:hover { opacity: 0.85; }
+
     .podium-first {
       margin-bottom: 16px;
     }
@@ -218,7 +222,11 @@ import { environment } from '../../../environments/environment';
       padding: 12px 16px;
       border-bottom: 1px solid #f3f4f6;
       transition: background 0.1s;
+      cursor: pointer;
     }
+
+    .rank-row:hover { background: #f9fafb; }
+    .rank-row.is-me:hover { background: #dbeafe; }
 
     .rank-row.is-me {
       background: #eff6ff;
@@ -297,7 +305,7 @@ export class LeaderboardComponent implements OnInit {
   rest = computed(() => this.entries().length >= 3 ? this.entries().slice(3) : this.entries());
 
 
-  constructor(public auth: AuthService, private http: HttpClient) {}
+  constructor(public auth: AuthService, private http: HttpClient, private router: Router) {}
 
   ngOnInit() {
     this.loadLeaderboard('global');
@@ -323,5 +331,9 @@ export class LeaderboardComponent implements OnInit {
     if (tab === 'run') return entry.xpRun ?? 0;
     if (tab === 'bike') return entry.xpBike ?? 0;
     return entry.xpTotal ?? 0;
+  }
+
+  goToProfile(id: string) {
+    this.router.navigate(['/users', id]);
   }
 }

@@ -56,12 +56,13 @@ export class ActivitiesService {
     await this.saveActivity(freshUser, stravaActivity);
   }
 
-  getSyncStatus(user: User): { canSync: boolean; secondsUntilSync: number } {
-    if (!user.lastSyncAt) return { canSync: true, secondsUntilSync: 0 };
+  getSyncStatus(user: User): { canSync: boolean; secondsUntilSync: number; stravaEligibleCount: number | null } {
+    const stravaEligibleCount = user.stravaEligibleCount ?? null;
+    if (!user.lastSyncAt) return { canSync: true, secondsUntilSync: 0, stravaEligibleCount };
     const elapsed = Date.now() - new Date(user.lastSyncAt).getTime();
     const remaining = SYNC_COOLDOWN_MS - elapsed;
-    if (remaining <= 0) return { canSync: true, secondsUntilSync: 0 };
-    return { canSync: false, secondsUntilSync: Math.ceil(remaining / 1000) };
+    if (remaining <= 0) return { canSync: true, secondsUntilSync: 0, stravaEligibleCount };
+    return { canSync: false, secondsUntilSync: Math.ceil(remaining / 1000), stravaEligibleCount };
   }
 
   async syncAllActivities(user: User): Promise<{ imported: number; skipped: number; remaining: number }> {
@@ -95,6 +96,9 @@ export class ActivitiesService {
 
     // 2. Filtrer par sport autorisé
     const eligible = allActivities.filter(a => ALLOWED_SPORT_TYPES.has(a.sport_type));
+
+    // Persist le total éligible Strava pour affichage sur le profil
+    await this.userRepo.update(user.id, { stravaEligibleCount: eligible.length });
 
     // 3. Identifier en une seule requête celles déjà importées
     const eligibleIds = eligible.map(a => a.id);

@@ -23,7 +23,13 @@
       "Bash(npm run *)",
       "Bash(Get-ChildItem -Path \"E:\\\\SportXP\" -Force)",
       "Bash(Format-Table -AutoSize)",
-      "PowerShell(Get-ChildItem -Path \"E:\\\\SportXP\\\\backend\" -Name | Where-Object { $_ -match \"\\\\.env|config|tsconfig\" })"
+      "PowerShell(Get-ChildItem -Path \"E:\\\\SportXP\\\\backend\" -Name | Where-Object { $_ -match \"\\\\.env|config|tsconfig\" })",
+      "Bash(Get-ChildItem -Path \"E:\\\\SportXP\" -Directory)",
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
+      "Bash(xargs grep -l \"syncAllActivities\\\\|importSingleActivity\")",
+      "Bash(npx tsc *)",
+      "PowerShell(cd E:\\\\SportXP\\\\frontend; npx tsc --noEmit 2>&1 | Where-Object { $_ -notmatch \"spec.ts\" } | Select-Object -First 30)",
+      "PowerShell(Set-Location E:\\\\SportXP\\\\frontend; $result = npx tsc --noEmit 2>&1; $result | Where-Object { $_ -notmatch \"spec\\\\.ts\" } | Select-Object -First 30; exit 0)"
     ]
   }
 }

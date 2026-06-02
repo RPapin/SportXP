@@ -17,7 +17,7 @@ export class AuthController {
     const slot = await this.authService.getAvailableSlot(slotHint);
 
     if (!slot) {
-      const frontendUrl = this.config.get<string>('FRONTEND_URL');
+      const frontendUrl = (this.config.get<string>('FRONTEND_URL') ?? '').split(',')[0].trim();
       return res.redirect(`${frontendUrl}/auth/error?reason=capacity`);
     }
 
@@ -42,7 +42,7 @@ export class AuthController {
     @Query('error') error: string,
     @Res() res: Response,
   ) {
-    const frontendUrl = this.config.get<string>('FRONTEND_URL');
+    const frontendUrl = (this.config.get<string>('FRONTEND_URL') ?? '').split(',')[0].trim();
 
     if (error || !code) {
       return res.redirect(`${frontendUrl}/auth/error?reason=denied`);
@@ -53,7 +53,10 @@ export class AuthController {
       return res.redirect(`${frontendUrl}/auth/error`);
     }
 
-    const user = await this.authService.handleStravaCallback(code, slot);
+    const apiUrl = this.config.get<string>('API_URL');
+    const redirectUri = `${apiUrl}/api/auth/strava/${slot}/callback`;
+
+    const user = await this.authService.handleStravaCallback(code, slot, redirectUri);
     const token = this.authService.generateJWT(user);
     return res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
   }

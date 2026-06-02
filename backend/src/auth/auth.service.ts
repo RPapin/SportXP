@@ -60,7 +60,7 @@ export class AuthService {
     return null;
   }
 
-  async handleStravaCallback(code: string, slot: number): Promise<User> {
+  async handleStravaCallback(code: string, slot: number, redirectUri: string): Promise<User> {
     const { clientId, clientSecret } = this.getKeyConfig(slot);
 
     const { data } = await axios.post('https://www.strava.com/oauth/token', {
@@ -68,6 +68,7 @@ export class AuthService {
       client_secret: clientSecret,
       code,
       grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
     });
 
     const athlete = data.athlete;

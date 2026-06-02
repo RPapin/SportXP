@@ -67,6 +67,9 @@ export class User {
   @Column({ type: 'timestamp', nullable: true, name: 'last_sync_at' })
   lastSyncAt: Date | null;
 
+  @Column({ type: 'int', nullable: true, name: 'strava_eligible_count' })
+  stravaEligibleCount: number | null;
+
   @Column({ type: 'boolean', default: true, name: 'is_active' })
   isActive: boolean;
 

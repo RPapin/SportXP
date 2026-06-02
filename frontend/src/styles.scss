@@ -1,16 +1,16 @@
 @use '@angular/material' as mat;
+
 @include mat.core();
 
-$primary-palette: mat.define-palette(mat.$blue-palette, 600);
-$accent-palette: mat.define-palette(mat.$amber-palette, A200);
-
-$theme: mat.define-light-theme((
-  color: (primary: $primary-palette, accent: $accent-palette),
-  typography: mat.define-typography-config(),
-  density: 0,
-));
-
-@include mat.all-component-themes($theme);
+html {
+  @include mat.theme((
+    color: (
+      theme-type: light,
+      primary: mat.$azure-palette,
+    ),
+    density: 0,
+  ));
+}
 
 @import 'leaflet/dist/leaflet.css';
 
