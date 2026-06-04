@@ -1,0 +1,185 @@
+<div class="feed-root">
+
+  <!-- Tabs -->
+  <div class="tabs-bar">
+    <button class="tab" [class.active]="activeTab() === 'activities'" (click)="activeTab.set('activities')">
+      Activités
+      @if (activeTab() === 'activities') { <span class="tab-line"></span> }
+    </button>
+    <button class="tab" [class.active]="activeTab() === 'favorites'" (click)="activeTab.set('favorites')">
+      Favoris
+      @if (activeTab() === 'favorites') { <span class="tab-line"></span> }
+    </button>
+    <button class="tab" [class.active]="activeTab() === 'notifications'" (click)="activeTab.set('notifications')">
+      Notifications
+      @if (activeTab() === 'notifications') { <span class="tab-line"></span> }
+    </button>
+  </div>
+
+  <!-- Feed -->
+  @if (activeTab() === 'activities') {
+
+    @if (!auth.isLoggedIn()) {
+      <div class="login-banner">
+        <div class="login-icon">🏆</div>
+        <h2>SportXP</h2>
+        <p>Grimpe, accumule des XP, domine le leaderboard</p>
+        <button class="strava-btn" (click)="auth.loginWithStrava()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+          </svg>
+          Connecter avec Strava
+        </button>
+      </div>
+    }
+
+    <div class="activities-list">
+      @if (loading()) {
+        @for (i of [1,2,3]; track i) {
+          <div class="card skeleton-card">
+            <div class="card-header">
+              <div class="sk sk-circle"></div>
+              <div class="sk-lines">
+                <div class="sk sk-line" style="width:55%"></div>
+                <div class="sk sk-line" style="width:30%"></div>
+              </div>
+            </div>
+            <div class="sk sk-map"></div>
+            <div class="card-body">
+              <div class="sk sk-line" style="width:70%;margin-bottom:8px"></div>
+              <div class="sk sk-line" style="width:90%"></div>
+            </div>
+            <div class="card-footer">
+              <div class="sk sk-line" style="width:40%"></div>
+            </div>
+          </div>
+        }
+      }
+
+      @for (activity of activities(); track activity.id) {
+        <article class="card">
+          <!-- Header -->
+          <div class="card-header">
+            <img
+              class="avatar clickable"
+              [src]="activity.user?.avatarUrl || 'assets/avatar-default.png'"
+              [alt]="activity.user?.firstName"
+              (error)="onImgError($event)"
+              (click)="goToProfile(activity.user?.id)"
+            />
+            <div class="author-block">
+              <div class="author-line">
+                <span class="author-name clickable" (click)="goToProfile(activity.user?.id)">{{ activity.user?.firstName }} {{ activity.user?.lastName }}</span>
+                <span class="author-action"> a fait une sortie</span>
+              </div>
+              <div class="author-time">{{ timeAgo(activity.startDate) }}</div>
+            </div>
+            <button class="menu-btn" aria-label="Plus d'options">
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            </button>
+          </div>
+
+          <!-- Map -->
+          <div class="map-wrap">
+            @if (activity.geojson) {
+              <app-activity-map-preview
+                [geojson]="activity.geojson"
+                [color]="sportColor(activity.sportType)"
+              />
+            } @else {
+              <div class="no-map">
+                <span class="no-map-emoji">{{ sportEmoji(activity.sportType) }}</span>
+                <span class="no-map-text">Pas de tracé GPS</span>
+              </div>
+            }
+          </div>
+
+          <!-- Body -->
+          <div class="card-body">
+            <div class="post-title">{{ activity.name }}</div>
+            <div class="post-desc">
+              {{ sportLabel(activity.sportType) }} · {{ (activity.distanceM / 1000) | number:'1.1-1' }} km · +{{ activity.xpEarned | number:'1.0-0' }} XP
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="card-footer">
+            <button class="react-btn" [class.liked]="activity.likedByMe" (click)="toggleLike(activity)">
+              <svg width="17" height="17" viewBox="0 0 24 24" [attr.fill]="activity.likedByMe ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              </svg>
+              <span>{{ activity.likesCount }} j'aime</span>
+            </button>
+            <button class="react-btn" [class.active-comment]="openComments().has(activity.id)" (click)="toggleComments(activity)">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span>{{ activity.commentsCount }} commentaires</span>
+            </button>
+          </div>
+
+          <!-- Comments section -->
+          @if (openComments().has(activity.id)) {
+            <div class="comments-section">
+              @if (commentsLoading().has(activity.id)) {
+                <div class="comments-loading">Chargement…</div>
+              }
+              @for (comment of (commentsCache().get(activity.id) ?? []); track comment.id) {
+                <div class="comment-row">
+                  <img class="comment-avatar" [src]="comment.user.avatarUrl || 'assets/avatar-default.png'" [alt]="comment.user.firstName" />
+                  <div class="comment-bubble">
+                    <span class="comment-author">{{ comment.user.firstName }} {{ comment.user.lastName }}</span>
+                    <span class="comment-text">{{ comment.content }}</span>
+                  </div>
+                  @if (comment.user.id === auth.currentUser()?.id) {
+                    <button class="comment-delete" (click)="deleteComment(activity, comment.id)" title="Supprimer">✕</button>
+                  }
+                </div>
+              }
+              @if (auth.isLoggedIn()) {
+                <div class="comment-form">
+                  <img class="comment-avatar" [src]="auth.currentUser()?.avatarUrl || 'assets/avatar-default.png'" alt="moi" />
+                  <input
+                    class="comment-input"
+                    type="text"
+                    placeholder="Ajouter un commentaire…"
+                    [(ngModel)]="commentDrafts[activity.id]"
+                    (keydown.enter)="submitComment(activity)"
+                  />
+                  <button class="comment-send" (click)="submitComment(activity)" [disabled]="!commentDrafts[activity.id]?.trim()">
+                    ➤
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </article>
+      }
+
+      @if (activities().length === 0 && !loading()) {
+        <div class="empty-state">
+          <div class="empty-icon">🏃</div>
+          <p>Aucune activité pour l'instant.</p>
+          <p class="empty-sub">Connecte ton compte Strava et commence à accumuler des XP !</p>
+        </div>
+      }
+    </div>
+  }
+
+  @if (activeTab() === 'favorites') {
+    <div class="empty-state">
+      <div class="empty-icon">⭐</div>
+      <p>Aucun favori</p>
+      <p class="empty-sub">Tes activités favorites apparaîtront ici.</p>
+    </div>
+  }
+
+  @if (activeTab() === 'notifications') {
+    <div class="empty-state">
+      <div class="empty-icon">🔔</div>
+      <p>Aucune notification</p>
+      <p class="empty-sub">Tu seras notifié des nouvelles activités de tes amis.</p>
+    </div>
+  }
+
+</div>

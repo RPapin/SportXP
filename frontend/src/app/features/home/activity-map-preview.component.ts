@@ -4,11 +4,8 @@ import * as L from 'leaflet';
 @Component({
   selector: 'app-activity-map-preview',
   standalone: true,
-  template: `<div #mapEl class="map-wrap"></div>`,
-  styles: [`
-    :host { display: block; height: 220px; }
-    .map-wrap { width: 100%; height: 100%; background: #e5e7eb; }
-  `],
+  templateUrl: './activity-map-preview.component.html',
+  styleUrl: './activity-map-preview.component.css',
 })
 export class ActivityMapPreviewComponent implements AfterViewInit, OnDestroy {
   @ViewChild('mapEl', { static: true }) mapEl!: ElementRef<HTMLDivElement>;

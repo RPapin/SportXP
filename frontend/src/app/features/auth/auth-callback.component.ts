@@ -1,16 +1,18 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { AutoSyncService } from '../../core/services/auto-sync.service';
 
 @Component({
   selector: 'app-auth-callback',
   standalone: true,
-  template: `<p style="text-align:center;padding:2rem;">Connexion en cours...</p>`,
+  templateUrl: './auth-callback.component.html',
 })
 export class AuthCallbackComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private authService: AuthService,
+    private autoSync: AutoSyncService,
     private router: Router,
   ) {}
 
@@ -19,6 +21,7 @@ export class AuthCallbackComponent implements OnInit {
     if (token) {
       this.authService.handleCallback(token);
       await this.authService.init();
+      await this.autoSync.checkAndSync();
       this.router.navigate(['/profile']);
     } else {
       this.router.navigate(['/home']);

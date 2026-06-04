@@ -1,0 +1,15 @@
+<div class="map-page">
+  <div class="filter-bar">
+    @for (f of filters; track f.value) {
+      <button
+        class="filter-chip"
+        [class.active]="sportTypeFilter === f.value"
+        [style.--chip-color]="f.color"
+        (click)="setFilter(f.value)"
+      >
+        {{ f.label }}
+      </button>
+    }
+  </div>
+  <div id="leaflet-map" class="map-container"></div>
+</div>

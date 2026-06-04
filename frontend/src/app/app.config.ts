@@ -5,6 +5,7 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { AuthService } from './core/services/auth.service';
+import { AutoSyncService } from './core/services/auto-sync.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -13,8 +14,11 @@ export const appConfig: ApplicationConfig = {
     provideAnimationsAsync(),
     {
       provide: APP_INITIALIZER,
-      useFactory: (auth: AuthService) => () => auth.init(),
-      deps: [AuthService],
+      useFactory: (auth: AuthService, autoSync: AutoSyncService) => async () => {
+        await auth.init();
+        await autoSync.checkAndSync();
+      },
+      deps: [AuthService, AutoSyncService],
       multi: true,
     },
   ],

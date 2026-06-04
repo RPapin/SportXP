@@ -1,0 +1,80 @@
+<div class="leaderboard-page">
+  <!-- Tabs -->
+  <div class="tabs-bar">
+    <button class="tab" [class.active]="activeTab() === 'global'" (click)="setTab('global')">
+      🌍 Global
+      @if (activeTab() === 'global') { <span class="tab-indicator"></span> }
+    </button>
+    <button class="tab" [class.active]="activeTab() === 'run'" (click)="setTab('run')">
+      🏃 Course
+      @if (activeTab() === 'run') { <span class="tab-indicator"></span> }
+    </button>
+    <button class="tab" [class.active]="activeTab() === 'bike'" (click)="setTab('bike')">
+      🚴 Vélo
+      @if (activeTab() === 'bike') { <span class="tab-indicator"></span> }
+    </button>
+  </div>
+
+  <div class="list-area">
+    <!-- Podium Top 3 -->
+    @if (top3().length === 3) {
+      <div class="podium">
+        <!-- 2nd place -->
+        <div class="podium-item clickable" (click)="goToProfile(top3()[1].id)">
+          <img class="podium-avatar silver" [src]="top3()[1].avatarUrl || 'assets/avatar-default.png'" [alt]="top3()[1].firstName" />
+          <div class="podium-rank silver-rank">2</div>
+          <div class="podium-name">{{ top3()[1].firstName }}</div>
+          <div class="podium-pts silver-pts">{{ xp(top3()[1]) | number }} XP</div>
+        </div>
+        <!-- 1st place -->
+        <div class="podium-item podium-first clickable" (click)="goToProfile(top3()[0].id)">
+          <div class="crown">👑</div>
+          <img class="podium-avatar gold" [src]="top3()[0].avatarUrl || 'assets/avatar-default.png'" [alt]="top3()[0].firstName" />
+          <div class="podium-rank gold-rank">1</div>
+          <div class="podium-name">{{ top3()[0].firstName }}</div>
+          <div class="podium-pts gold-pts">{{ xp(top3()[0]) | number }} XP</div>
+        </div>
+        <!-- 3rd place -->
+        <div class="podium-item clickable" (click)="goToProfile(top3()[2].id)">
+          <img class="podium-avatar bronze" [src]="top3()[2].avatarUrl || 'assets/avatar-default.png'" [alt]="top3()[2].firstName" />
+          <div class="podium-rank bronze-rank">3</div>
+          <div class="podium-name">{{ top3()[2].firstName }}</div>
+          <div class="podium-pts bronze-pts">{{ xp(top3()[2]) | number }} XP</div>
+        </div>
+      </div>
+    }
+
+    <!-- Ranked List -->
+    <div class="rank-list">
+      @for (entry of rest(); track entry.id) {
+        <div class="rank-row" [class.is-me]="entry.id === auth.currentUser()?.id" (click)="goToProfile(entry.id)">
+          <div class="rank-number" [class.top-rank]="entry.rank <= 3">{{ entry.rank }}</div>
+          <img class="rank-avatar" [src]="entry.avatarUrl || 'assets/avatar-default.png'" [alt]="entry.firstName" />
+          <div class="rank-info">
+            <div class="rank-name">
+              {{ entry.firstName }} {{ entry.lastName }}
+              @if (entry.id === auth.currentUser()?.id) {
+                <span class="me-badge">Vous</span>
+              }
+            </div>
+            <div class="rank-meta">
+              Niv. {{ level(entry.xpTotal) }}
+              @if (entry.region) { · {{ entry.region }} }
+            </div>
+          </div>
+          <div class="rank-xp">
+            <div class="xp-value">{{ xp(entry) | number }}</div>
+            <div class="xp-label">XP</div>
+          </div>
+        </div>
+      }
+
+      @if (entries().length === 0) {
+        <div class="empty">
+          <div class="empty-icon">🏅</div>
+          <p>Aucun résultat pour l'instant</p>
+        </div>
+      }
+    </div>
+  </div>
+</div>

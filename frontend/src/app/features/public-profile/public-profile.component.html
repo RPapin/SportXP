@@ -1,0 +1,109 @@
+<div class="profile-page">
+  <!-- Back button -->
+  <button class="back-btn" (click)="back()">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <path d="M19 12H5"/>
+      <path d="M12 19l-7-7 7-7"/>
+    </svg>
+    Retour
+  </button>
+
+  @if (loading()) {
+    <div class="loader-wrap">
+      <div class="loader"></div>
+    </div>
+  } @else if (profile(); as p) {
+    <!-- Gradient Header -->
+    <div class="profile-header">
+      <img
+        class="profile-avatar"
+        [src]="p.avatarUrl || 'assets/avatar-default.png'"
+        [alt]="p.firstName"
+      />
+      <h2 class="profile-name">{{ p.firstName }} {{ p.lastName }}</h2>
+      @if (p.city || p.country) {
+        <p class="profile-location">
+          {{ p.city }}{{ p.city && p.country ? ', ' : '' }}{{ p.country }}
+        </p>
+      }
+
+      <!-- XP Bar -->
+      <div class="xp-bar-container">
+        <div class="xp-bar-header">
+          <div class="level-info">
+            <span class="level-text">Niveau {{ level(p.xpTotal) }}</span>
+            <span class="level-badge">Athlète</span>
+          </div>
+          <span class="xp-ratio">{{ p.xpTotal | number }} / {{ nextXP(p.xpTotal) | number }} XP</span>
+        </div>
+        <div class="xp-track">
+          <div class="xp-fill" [style.width.%]="progress(p.xpTotal)"></div>
+        </div>
+        <p class="xp-remaining">{{ (nextXP(p.xpTotal) - p.xpTotal) | number }} XP jusqu'au niveau {{ level(p.xpTotal) + 1 }}</p>
+      </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value">{{ p.xpTotal | number }}</div>
+        <div class="stat-label">XP Total</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ p.activityCount }}</div>
+        <div class="stat-label">Activités</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ (p.totalDistanceM / 1000) | number:'1.0-0' }}</div>
+        <div class="stat-label">km parcourus</div>
+      </div>
+    </div>
+
+    <!-- Achievements -->
+    @if (p.achievements?.length > 0) {
+      <div class="section">
+        <div class="section-header">
+          <h3 class="section-title"><span>🏅</span> Trophées</h3>
+        </div>
+        <div class="achievements-grid">
+          @for (ua of p.achievements; track ua.id) {
+            <div class="achievement-item" [title]="ua.description">
+              <div class="achievement-icon">{{ achievementIcon(ua.name) }}</div>
+              <span class="achievement-name">{{ ua.name }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Recent Activities -->
+    <div class="section">
+      <div class="section-header">
+        <h3 class="section-title"><span>⚡</span> Activités récentes</h3>
+      </div>
+      @for (a of activities().slice(0, 20); track a.id) {
+        <div class="activity-row">
+          <div class="activity-emoji">{{ sportIcon(a.sportType) }}</div>
+          <div class="activity-details">
+            <div class="activity-name">{{ a.name }}</div>
+            <div class="activity-meta">
+              {{ (a.distanceM / 1000) | number:'1.1-1' }} km
+              @if (a.startDate) { · {{ a.startDate | date:'dd MMM yy' }} }
+            </div>
+          </div>
+          <div class="activity-xp">+{{ a.xpEarned | number:'1.0-0' }} XP</div>
+        </div>
+      }
+      @if (activities().length === 0) {
+        <p class="no-activities">Aucune activité</p>
+      }
+    </div>
+
+    <div class="page-bottom"></div>
+  } @else {
+    <div class="not-found">
+      <div class="not-found-icon">👤</div>
+      <p>Profil introuvable</p>
+    </div>
+  }
+</div>

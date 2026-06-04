@@ -21,77 +21,8 @@ const SPORT_COLORS: Record<string, string> = {
   selector: 'app-map',
   standalone: true,
   imports: [CommonModule],
-  template: `
-    <div class="map-page">
-      <div class="filter-bar">
-        @for (f of filters; track f.value) {
-          <button
-            class="filter-chip"
-            [class.active]="sportTypeFilter === f.value"
-            [style.--chip-color]="f.color"
-            (click)="setFilter(f.value)"
-          >
-            {{ f.label }}
-          </button>
-        }
-      </div>
-      <div id="leaflet-map" class="map-container"></div>
-    </div>
-  `,
-  styles: [`
-    .map-page {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-
-    .filter-bar {
-      display: flex;
-      gap: 8px;
-      padding: 10px 12px;
-      background: white;
-      border-bottom: 1px solid rgba(0,0,0,.08);
-      overflow-x: auto;
-      flex-shrink: 0;
-      scrollbar-width: none;
-    }
-    .filter-bar::-webkit-scrollbar { display: none; }
-
-    .filter-chip {
-      display: inline-flex;
-      align-items: center;
-      padding: 6px 14px;
-      border-radius: 999px;
-      border: 1.5px solid var(--chip-color, #6b7280);
-      background: transparent;
-      color: var(--chip-color, #6b7280);
-      font-size: 0.8rem;
-      font-weight: 500;
-      cursor: pointer;
-      white-space: nowrap;
-      font-family: inherit;
-      transition: background 0.15s, color 0.15s;
-    }
-
-    .filter-chip.active {
-      background: var(--chip-color, #6b7280);
-      color: white;
-    }
-
-    .map-container {
-      flex: 1;
-      min-height: 0;
-    }
-
-    :global(.leaflet-popup-content-wrapper) {
-      border-radius: 10px !important;
-      box-shadow: 0 4px 16px rgba(0,0,0,.12) !important;
-    }
-    :global(.leaflet-popup-content) {
-      font-family: 'Inter', system-ui, sans-serif !important;
-      font-size: 0.82rem !important;
-    }
-  `],
+  templateUrl: './map.component.html',
+  styleUrl: './map.component.css',
 })
 export class MapComponent implements AfterViewInit, OnDestroy {
   sportTypeFilter = '';

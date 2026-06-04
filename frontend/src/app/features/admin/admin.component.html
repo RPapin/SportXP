@@ -1,0 +1,173 @@
+<div class="admin-page">
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-value">{{ stats().totalUsers }}</div>
+      <div class="stat-label">Membres</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ stats().totalActivities }}</div>
+      <div class="stat-label">Activités</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ stats().totalXPDistributed | number }}</div>
+      <div class="stat-label">XP distribués</div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions-bar">
+    <button class="btn btn-primary" (click)="recalculateXP()" [disabled]="recalcLoading()">
+      @if (recalcLoading()) { ⏳ Recalcul en cours… } @else { 🔄 Recalculer tout l'XP }
+    </button>
+    @if (recalcMsg()) {
+      <span class="recalc-msg">{{ recalcMsg() }}</span>
+    }
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs-bar">
+    <button class="tab" [class.active]="activeTab() === 'users'" (click)="activeTab.set('users')">
+      👥 Membres
+      @if (activeTab() === 'users') { <span class="tab-indicator"></span> }
+    </button>
+    <button class="tab" [class.active]="activeTab() === 'achievements'" (click)="activeTab.set('achievements')">
+      🏆 Achievements
+      @if (activeTab() === 'achievements') { <span class="tab-indicator"></span> }
+    </button>
+  </div>
+
+  <!-- Users tab -->
+  @if (activeTab() === 'users') {
+    <div class="section">
+      <div class="user-list">
+        @for (u of users(); track u.id) {
+          <div class="user-card" [class.inactive]="!u.isActive">
+            <img class="user-avatar" [src]="u.avatarUrl || 'assets/avatar-default.png'" [alt]="u.firstName" />
+            <div class="user-info">
+              <div class="user-name">
+                {{ u.firstName }} {{ u.lastName }}
+                <span class="badge" [class.badge-admin]="u.role === 'admin'" [class.badge-athlete]="u.role === 'athlete'">
+                  {{ u.role === 'admin' ? '🛡️ Admin' : '🏃 Athlète' }}
+                </span>
+                @if (!u.isActive) { <span class="badge badge-inactive">Inactif</span> }
+              </div>
+              <div class="user-meta">
+                Strava #{{ u.stravaId }} · {{ u.region || 'N/A' }}
+              </div>
+              <div class="user-xp">
+                <span class="xp-chip global">🌍 {{ u.xpTotal | number }} XP</span>
+                <span class="xp-chip run">🏃 {{ u.xpRun | number }} XP</span>
+                <span class="xp-chip bike">🚴 {{ u.xpBike | number }} XP</span>
+                <span class="xp-chip level">Niv. {{ u.level }}</span>
+              </div>
+            </div>
+            <div class="user-actions">
+              <button class="btn-sm btn-role" (click)="toggleRole(u)"
+                [title]="u.role === 'admin' ? 'Rétrograder en athlète' : 'Promouvoir admin'">
+                {{ u.role === 'admin' ? '↓ Athlète' : '↑ Admin' }}
+              </button>
+              <button class="btn-sm btn-active" (click)="toggleActive(u)"
+                [title]="u.isActive ? 'Désactiver' : 'Réactiver'">
+                {{ u.isActive ? '⛔ Désactiver' : '✅ Réactiver' }}
+              </button>
+              <button class="btn-sm btn-delete" (click)="deleteUser(u)" title="Supprimer">
+                🗑️
+              </button>
+            </div>
+          </div>
+        }
+        @if (users().length === 0) {
+          <div class="empty">Aucun membre</div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Achievements tab -->
+  @if (activeTab() === 'achievements') {
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">{{ achievements().length }} achievement{{ achievements().length !== 1 ? 's' : '' }}</span>
+        <button class="btn-sm btn-add" (click)="toggleCreateForm()">
+          {{ showCreateForm() ? '✕ Annuler' : '➕ Ajouter' }}
+        </button>
+      </div>
+
+      @if (showCreateForm()) {
+        <form class="achievement-form" #createFormRef="ngForm" (ngSubmit)="submitCreate()">
+          <div class="form-row">
+            <input type="text" placeholder="Code (ex: first_run)" [(ngModel)]="createForm.code" name="c_code" required class="form-input" />
+            <input type="text" placeholder="Nom" [(ngModel)]="createForm.name" name="c_name" required class="form-input" />
+          </div>
+          <textarea placeholder="Description (optionnel)" [(ngModel)]="createForm.description" name="c_desc" rows="2" class="form-input"></textarea>
+          <div class="form-row">
+            <select [(ngModel)]="createForm.conditionType" name="c_type" required class="form-input form-select">
+              <option value="level">Niveau</option>
+              <option value="total_xp">XP total</option>
+              <option value="activity_count">Nb activités</option>
+              <option value="distance_total">Distance (m)</option>
+              <option value="streak_days">Streak (jours)</option>
+            </select>
+            <input type="number" placeholder="Valeur condition" [(ngModel)]="createForm.conditionValue" name="c_value" required class="form-input" />
+            <input type="number" placeholder="Seuil XP (opt.)" [(ngModel)]="createForm.xpThreshold" name="c_threshold" class="form-input" />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" [disabled]="!createFormRef.valid">Créer l'achievement</button>
+          </div>
+        </form>
+      }
+
+      <div class="achievement-list">
+        @for (a of achievements(); track a.id) {
+          @if (editingId() === a.id) {
+            <form class="achievement-form achievement-form--edit" #editFormRef="ngForm" (ngSubmit)="submitEdit(a.id)">
+              <div class="form-row">
+                <input type="text" placeholder="Code" [(ngModel)]="editForm.code" name="e_code" required class="form-input" />
+                <input type="text" placeholder="Nom" [(ngModel)]="editForm.name" name="e_name" required class="form-input" />
+              </div>
+              <textarea placeholder="Description" [(ngModel)]="editForm.description" name="e_desc" rows="2" class="form-input"></textarea>
+              <div class="form-row">
+                <select [(ngModel)]="editForm.conditionType" name="e_type" required class="form-input form-select">
+                  <option value="level">Niveau</option>
+                  <option value="total_xp">XP total</option>
+                  <option value="activity_count">Nb activités</option>
+                  <option value="distance_total">Distance (m)</option>
+                  <option value="streak_days">Streak (jours)</option>
+                </select>
+                <input type="number" placeholder="Valeur" [(ngModel)]="editForm.conditionValue" name="e_value" required class="form-input" />
+                <input type="number" placeholder="Seuil XP" [(ngModel)]="editForm.xpThreshold" name="e_threshold" class="form-input" />
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary" [disabled]="!editFormRef.valid">Enregistrer</button>
+                <button type="button" class="btn-sm btn-active" (click)="editingId.set('')">Annuler</button>
+              </div>
+            </form>
+          } @else {
+            <div class="achievement-card">
+              <div class="achievement-info">
+                <div class="achievement-name">{{ a.name }}</div>
+                <div class="achievement-code">{{ a.code }}</div>
+                <div class="achievement-cond">{{ conditionLabel(a.conditionType) }} ≥ {{ a.conditionValue }}{{ a.xpThreshold != null ? ' · ' + a.xpThreshold + ' XP' : '' }}</div>
+                @if (a.description) { <div class="achievement-desc">{{ a.description }}</div> }
+              </div>
+              <div class="achievement-actions">
+                <button class="btn-sm btn-edit" (click)="startEdit(a)" title="Modifier">✏️</button>
+                <button class="btn-sm btn-delete" (click)="deleteAchievement(a)" title="Supprimer">🗑️</button>
+              </div>
+            </div>
+          }
+        }
+        @if (achievements().length === 0 && !showCreateForm()) {
+          <div class="empty">Aucun achievement — cliquez sur ➕ pour en créer un</div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Toast -->
+  @if (toast()) {
+    <div class="toast">{{ toast() }}</div>
+  }
+</div>

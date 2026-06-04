@@ -1,0 +1,52 @@
+.map-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  background: white;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+.filter-bar::-webkit-scrollbar { display: none; }
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--chip-color, #6b7280);
+  background: transparent;
+  color: var(--chip-color, #6b7280);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+
+.filter-chip.active {
+  background: var(--chip-color, #6b7280);
+  color: white;
+}
+
+.map-container {
+  flex: 1;
+  min-height: 0;
+}
+
+::ng-deep .leaflet-popup-content-wrapper {
+  border-radius: 10px !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12) !important;
+}
+::ng-deep .leaflet-popup-content {
+  font-family: 'Inter', system-ui, sans-serif !important;
+  font-size: 0.82rem !important;
+}
