@@ -71,7 +71,7 @@ services:
       # Port interne que Traefik doit cibler
       - "traefik.http.services.sportxp.loadbalancer.server.port=80"
       # Nom du réseau Docker à utiliser (obligatoire si plusieurs réseaux)
-      - "traefik.docker.network=traefik"
+      - "traefik.docker.network=bet_default"
 
 networks:
   sportxp_internal:
