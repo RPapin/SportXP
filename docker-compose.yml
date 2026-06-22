@@ -56,7 +56,7 @@ services:
       - frontend
     networks:
       - sportxp_internal
-      - traefik          # réseau partagé avec Traefik
+      - bet_default      # réseau partagé avec Traefik
     labels:
       - "traefik.enable=true"
       # Routeur HTTPS
@@ -76,7 +76,7 @@ services:
 networks:
   sportxp_internal:
     driver: bridge
-  traefik:
+  bet_default:
     external: true   # réseau déjà créé par Traefik sur le VPS
 
 volumes:
