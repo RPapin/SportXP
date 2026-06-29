@@ -8,6 +8,7 @@ build/
 
 # Environment files — ne jamais committer les secrets
 backend/.env
+.env
 
 # Logs
 *.log
