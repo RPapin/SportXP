@@ -56,28 +56,13 @@ services:
       - frontend
     networks:
       - sportxp_internal
-      - bet_default      # réseau partagé avec Traefik
-    labels:
-      - "traefik.enable=true"
-      # Routeur HTTPS
-      - "traefik.http.routers.sportxp.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.sportxp.entrypoints=websecure"
-      - "traefik.http.routers.sportxp.tls.certresolver=letsencrypt"
-      # Routeur HTTP → redirection HTTPS
-      - "traefik.http.routers.sportxp-http.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.sportxp-http.entrypoints=web"
-      - "traefik.http.routers.sportxp-http.middlewares=sportxp-https-redirect"
-      - "traefik.http.middlewares.sportxp-https-redirect.redirectscheme.scheme=https"
-      # Port interne que Traefik doit cibler
-      - "traefik.http.services.sportxp.loadbalancer.server.port=80"
-      # Nom du réseau Docker à utiliser (obligatoire si plusieurs réseaux)
-      - "traefik.docker.network=bet_default"
+      - bet_default      # réseau partagé avec Caddy
 
 networks:
   sportxp_internal:
     driver: bridge
   bet_default:
-    external: true   # réseau déjà créé par Traefik sur le VPS
+    external: true   # réseau déjà créé par Caddy sur le VPS
 
 volumes:
   pgdata:
